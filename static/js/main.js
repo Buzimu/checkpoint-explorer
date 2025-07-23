@@ -9,10 +9,33 @@ function modelExplorer() {
     selectedType: "all",
     isConnected: false,
     loading: false,
+    showSettings: false,
+
+    // Settings form
+    settingsForm: {
+      models_directory: "",
+      auto_scan: true,
+      show_examples: true,
+    },
+
+    // Scan progress
+    scanProgress: {
+      active: false,
+      percent: 0,
+      current: 0,
+      total: 0,
+      message: "Initializing scan...",
+    },
 
     // Initialize
     async init() {
       console.log("🎨 ComfyUI Model Explorer initializing...");
+      console.log(
+        "⚙️ Alpine.js version:",
+        window.Alpine ? "loaded" : "not loaded"
+      );
+
+      await this.loadSettings();
       await this.loadModels();
       this.checkComfyUIConnection();
 
@@ -20,6 +43,20 @@ function modelExplorer() {
       setInterval(() => {
         this.checkComfyUIConnection();
       }, 30000); // Check every 30 seconds
+
+      console.log("✅ Initialization complete");
+    },
+
+    // Load settings from server
+    async loadSettings() {
+      try {
+        const response = await fetch("/api/settings");
+        const settings = await response.json();
+        this.settingsForm = { ...settings };
+        console.log("📄 Loaded settings:", settings);
+      } catch (error) {
+        console.error("❌ Failed to load settings:", error);
+      }
     },
 
     // Load models from API
@@ -27,20 +64,30 @@ function modelExplorer() {
       try {
         this.loading = true;
         const response = await fetch("/api/models");
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const data = await response.json();
 
-        this.models = data.models || [];
+        this.models = Array.isArray(data.models) ? data.models : [];
         this.filteredModels = [...this.models];
 
         console.log(`📂 Loaded ${this.models.length} models`);
 
-        // Auto-select first model if none selected
+        // Auto-select first model if none selected and models exist
         if (this.models.length > 0 && !this.selectedModel) {
           this.selectModel(this.models[0]);
         }
       } catch (error) {
         console.error("❌ Failed to load models:", error);
-        this.showNotification("Failed to load models", "error");
+        this.showNotification(
+          "Failed to load models: " + error.message,
+          "error"
+        );
+        this.models = [];
+        this.filteredModels = [];
       } finally {
         this.loading = false;
       }
@@ -48,23 +95,30 @@ function modelExplorer() {
 
     // Filter models based on search and type
     filterModels() {
+      if (!this.models || !Array.isArray(this.models)) {
+        this.filteredModels = [];
+        return;
+      }
+
       let filtered = [...this.models];
 
       // Apply search filter
-      if (this.searchQuery.trim()) {
+      if (this.searchQuery && this.searchQuery.trim()) {
         const query = this.searchQuery.toLowerCase();
         filtered = filtered.filter(
           (model) =>
-            model.name.toLowerCase().includes(query) ||
-            model.type.toLowerCase().includes(query) ||
+            (model.name && model.name.toLowerCase().includes(query)) ||
+            (model.type && model.type.toLowerCase().includes(query)) ||
             (model.notes && model.notes.toLowerCase().includes(query))
         );
       }
 
       // Apply type filter
-      if (this.selectedType !== "all") {
+      if (this.selectedType && this.selectedType !== "all") {
         filtered = filtered.filter(
-          (model) => model.type.toLowerCase() === this.selectedType
+          (model) =>
+            model.type &&
+            model.type.toLowerCase() === this.selectedType.toLowerCase()
         );
       }
 
@@ -80,16 +134,170 @@ function modelExplorer() {
 
     // Select a model
     async selectModel(model) {
+      if (!model || !model.id) {
+        console.warn("⚠️ Attempted to select invalid model:", model);
+        return;
+      }
+
       this.selectedModel = model;
       console.log(`📋 Selected model: ${model.name}`);
 
       // Load detailed model info if needed
       try {
         const response = await fetch(`/api/models/${model.id}`);
-        const detailedModel = await response.json();
-        this.selectedModel = detailedModel;
+        if (response.ok) {
+          const detailedModel = await response.json();
+          this.selectedModel = detailedModel;
+        }
       } catch (error) {
         console.warn("⚠️ Failed to load detailed model info:", error);
+        // Continue with basic model info
+      }
+    },
+
+    // Settings functions
+    openSettings() {
+      this.showSettings = true;
+      console.log("⚙️ Opening settings");
+    },
+
+    closeSettings() {
+      this.showSettings = false;
+      this.scanProgress.active = false;
+      this.scanProgress.percent = 0;
+      console.log("⚙️ Closing settings");
+    },
+
+    async saveSettings() {
+      try {
+        console.log("💾 Saving settings:", this.settingsForm);
+
+        // Validate directory path
+        if (!this.settingsForm.models_directory.trim()) {
+          this.showNotification(
+            "Please enter a models directory path",
+            "error"
+          );
+          return;
+        }
+
+        this.scanProgress.active = true;
+        this.scanProgress.message = "Saving settings...";
+        this.scanProgress.percent = 10;
+
+        const response = await fetch("/api/settings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(this.settingsForm),
+        });
+
+        console.log("📡 Settings API response status:", response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("❌ Settings API error:", errorText);
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("✅ Settings saved:", result);
+
+        this.showNotification("Settings saved successfully!", "success");
+
+        // Trigger scan
+        await this.scanModels();
+      } catch (error) {
+        console.error("❌ Failed to save settings:", error);
+        this.showNotification(
+          `Failed to save settings: ${error.message}`,
+          "error"
+        );
+        this.scanProgress.active = false;
+      }
+    },
+
+    async scanModels() {
+      try {
+        console.log(
+          "🔍 Starting scan for directory:",
+          this.settingsForm.models_directory
+        );
+
+        this.scanProgress.active = true;
+        this.scanProgress.message = "Scanning models directory...";
+        this.scanProgress.percent = 25;
+
+        const response = await fetch("/api/scan", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            directory: this.settingsForm.models_directory,
+          }),
+        });
+
+        console.log("📡 Scan API response status:", response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("❌ Scan API error:", errorText);
+          throw new Error(`Scan failed: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("✅ Scan completed:", result);
+
+        this.scanProgress.percent = 75;
+        this.scanProgress.message = "Loading models...";
+
+        // Reload models
+        await this.loadModels();
+
+        this.scanProgress.percent = 100;
+        this.scanProgress.message = `Found ${result.models_found} models!`;
+
+        this.showNotification(
+          `Scan complete! Found ${result.models_found} models.`,
+          "success"
+        );
+
+        // Close settings and hide progress after delay
+        setTimeout(() => {
+          this.closeSettings();
+        }, 1000);
+
+        setTimeout(() => {
+          this.scanProgress.active = false;
+          this.scanProgress.percent = 0;
+        }, 2000);
+      } catch (error) {
+        console.error("❌ Scan failed:", error);
+        this.showNotification(`Scan failed: ${error.message}`, "error");
+        this.scanProgress.active = false;
+      }
+    },
+
+    browseDirectory() {
+      // Provide helpful path suggestions since we can't open a file browser in web app
+      const suggestions = [
+        "Windows: C:\\ComfyUI\\models",
+        "Windows: C:\\stable-diffusion-webui\\models",
+        "Mac/Linux: /path/to/ComfyUI/models",
+        "Mac/Linux: ~/ComfyUI/models",
+      ];
+
+      const message =
+        "File browser not available in web version.\n\nCommon paths:\n" +
+        suggestions.join("\n");
+      alert(message);
+
+      // Focus the input field
+      const input = document.querySelector(".setting-input");
+      if (input) {
+        input.focus();
       }
     },
 
@@ -193,7 +401,15 @@ function modelExplorer() {
         });
         this.isConnected = response.ok;
       } catch (error) {
+        // Handle CORS and network errors gracefully
         this.isConnected = false;
+        // Only log if it's not a common CORS error
+        if (
+          !error.message.includes("CORS") &&
+          !error.message.includes("NetworkError")
+        ) {
+          console.warn("⚠️ ComfyUI connection check failed:", error.message);
+        }
       }
     },
 
@@ -271,15 +487,20 @@ function modelExplorer() {
 
     // Keyboard shortcuts
     handleKeydown(event) {
-      // Escape key - clear selection or search
+      // Escape key - clear selection or search or close modal
       if (event.key === "Escape") {
-        if (this.searchQuery) {
+        if (this.showSettings) {
+          this.closeSettings();
+        } else if (this.searchQuery) {
           this.searchQuery = "";
           this.filterModels();
         } else {
           this.selectedModel = null;
         }
       }
+
+      // Don't handle other shortcuts if modal is open
+      if (this.showSettings) return;
 
       // F2 - Edit notes
       if (event.key === "F2" && this.selectedModel) {
@@ -303,10 +524,12 @@ function modelExplorer() {
     },
 
     navigateModels(direction) {
-      if (this.filteredModels.length === 0) return;
+      if (!this.filteredModels || this.filteredModels.length === 0) return;
 
       let currentIndex = this.selectedModel
-        ? this.filteredModels.findIndex((m) => m.id === this.selectedModel.id)
+        ? this.filteredModels.findIndex(
+            (m) => m && m.id === this.selectedModel.id
+          )
         : -1;
 
       let newIndex = currentIndex + direction;
@@ -317,7 +540,9 @@ function modelExplorer() {
         newIndex = this.filteredModels.length - 1;
       }
 
-      this.selectModel(this.filteredModels[newIndex]);
+      if (this.filteredModels[newIndex]) {
+        this.selectModel(this.filteredModels[newIndex]);
+      }
     },
   };
 }

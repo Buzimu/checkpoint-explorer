@@ -89,16 +89,34 @@
             class="model-title"
             x-text="selectedModel ? selectedModel.name : 'Select a Model'"
           ></div>
-          <div class="action-buttons" x-show="selectedModel">
-            <a href="#" class="btn btn-secondary" @click.prevent="openFolder()"
-              >📁 Open Folder</a
-            >
-            <a href="#" class="btn btn-secondary" @click.prevent="editNotes()"
-              >📝 Edit Notes</a
-            >
-            <a href="#" class="btn btn-primary" @click.prevent="openCivitAI()"
-              >🌐 View on CivitAI</a
-            >
+          <div class="action-buttons">
+            <template x-if="!selectedModel || models.length === 0">
+              <button class="btn btn-primary" @click="openSettings()">
+                ⚙️ Configure Models Directory
+              </button>
+            </template>
+            <template x-if="selectedModel">
+              <div style="display: flex; gap: 12px">
+                <a
+                  href="#"
+                  class="btn btn-secondary"
+                  @click.prevent="openFolder()"
+                  >📁 Open Folder</a
+                >
+                <a
+                  href="#"
+                  class="btn btn-secondary"
+                  @click.prevent="editNotes()"
+                  >📝 Edit Notes</a
+                >
+                <a
+                  href="#"
+                  class="btn btn-primary"
+                  @click.prevent="openCivitAI()"
+                  >🌐 View on CivitAI</a
+                >
+              </div>
+            </template>
           </div>
         </div>
 
@@ -156,7 +174,7 @@
                 <span class="info-label">Examples</span>
                 <span
                   class="info-value"
-                  x-text="selectedModel?.examples?.length || 0"
+                  x-text="(selectedModel?.examples?.length || 0)"
                 ></span>
               </div>
               <div class="info-item">
@@ -173,12 +191,12 @@
 
           <div
             class="gallery-section"
-            x-show="selectedModel?.examples?.length > 0"
+            x-show="selectedModel && selectedModel.examples && selectedModel.examples.length > 0"
           >
             <h3>🖼️ Example Images</h3>
             <div class="gallery-grid">
               <template
-                x-for="example in selectedModel.examples"
+                x-for="example in (selectedModel?.examples || [])"
                 :key="example.type"
               >
                 <div class="gallery-item" @click="viewExample(example)">
@@ -217,30 +235,166 @@
         </div>
 
         <div class="welcome-screen" x-show="!selectedModel">
-          <h2>Welcome to ComfyUI Model Explorer</h2>
-          <p>
-            Select a model from the sidebar to view its details, examples, and
-            notes.
-          </p>
-          <div class="stats">
-            <div class="stat-item">
-              <span class="stat-number" x-text="models.length"></span>
-              <span class="stat-label">Models Found</span>
+          <template x-if="models.length === 0">
+            <div style="text-align: center">
+              <h2>Welcome to ComfyUI Model Explorer</h2>
+              <p>
+                Get started by configuring your ComfyUI models directory to scan
+                and organize your collection.
+              </p>
+              <button
+                class="btn btn-primary"
+                @click="openSettings()"
+                style="margin: 20px 0"
+              >
+                📂 Configure Models Directory
+              </button>
+              <div class="stats">
+                <div class="stat-item">
+                  <span class="stat-number" x-text="models?.length || 0"></span>
+                  <span class="stat-label">Models Found</span>
+                </div>
+                <div class="stat-item">
+                  <span
+                    class="stat-number"
+                    x-text="(models || []).filter(m => m?.has_notes).length"
+                  ></span>
+                  <span class="stat-label">With Notes</span>
+                </div>
+                <div class="stat-item">
+                  <span
+                    class="stat-number"
+                    x-text="new Set((models || []).map(m => m?.type).filter(Boolean)).size"
+                  ></span>
+                  <span class="stat-label">Types</span>
+                </div>
+              </div>
             </div>
-            <div class="stat-item">
-              <span
-                class="stat-number"
-                x-text="models.filter(m => m.has_notes).length"
-              ></span>
-              <span class="stat-label">With Notes</span>
+          </template>
+          <template x-if="models.length > 0">
+            <div style="text-align: center">
+              <h2>Welcome to ComfyUI Model Explorer</h2>
+              <p>
+                Select a model from the sidebar to view its details, examples,
+                and notes.
+              </p>
+              <div class="stats">
+                <div class="stat-item">
+                  <span class="stat-number" x-text="models?.length || 0"></span>
+                  <span class="stat-label">Models Found</span>
+                </div>
+                <div class="stat-item">
+                  <span
+                    class="stat-number"
+                    x-text="(models || []).filter(m => m?.has_notes).length"
+                  ></span>
+                  <span class="stat-label">With Notes</span>
+                </div>
+                <div class="stat-item">
+                  <span
+                    class="stat-number"
+                    x-text="new Set((models || []).map(m => m?.type).filter(Boolean)).size"
+                  ></span>
+                  <span class="stat-label">Types</span>
+                </div>
+              </div>
             </div>
-            <div class="stat-item">
-              <span
-                class="stat-number"
-                x-text="new Set(models.map(m => m.type)).size"
-              ></span>
-              <span class="stat-label">Types</span>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div
+      class="modal-overlay"
+      x-show="showSettings"
+      x-transition:enter="fade-enter-active"
+      x-transition:enter-start="fade-enter-from"
+      x-transition:leave="fade-leave-active"
+      x-transition:leave-to="fade-leave-to"
+      @click.self="closeSettings()"
+    >
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>⚙️ Settings</h3>
+          <button type="button" class="modal-close" @click="closeSettings()">
+            ×
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="setting-group">
+            <label class="setting-label">Models Directory</label>
+            <div class="directory-input-group">
+              <input
+                type="text"
+                class="setting-input"
+                x-model="settingsForm.models_directory"
+                placeholder="e.g., C:\ComfyUI\models or /path/to/comfyui/models"
+                @keydown.enter="saveSettings()"
+              />
+              <button
+                type="button"
+                class="btn btn-secondary"
+                @click="browseDirectory()"
+              >
+                📂 Browse
+              </button>
             </div>
+            <small class="setting-help">
+              Point to your ComfyUI models directory (should contain subfolders
+              like 'checkpoints', 'loras', 'vae', etc.)
+            </small>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-checkbox">
+              <input type="checkbox" x-model="settingsForm.auto_scan" />
+              <span class="checkmark"></span>
+              Auto-scan on startup
+            </label>
+            <small class="setting-help">
+              Automatically scan for new models when the app starts
+            </small>
+          </div>
+
+          <div class="setting-group">
+            <label class="setting-checkbox">
+              <input type="checkbox" x-model="settingsForm.show_examples" />
+              <span class="checkmark"></span>
+              Show example images
+            </label>
+            <small class="setting-help">
+              Display example images in model details (when available)
+            </small>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeSettings()">
+            Cancel
+          </button>
+          <button
+            class="btn btn-primary"
+            @click="saveSettings()"
+            :disabled="!settingsForm.models_directory"
+          >
+            Save & Scan Models
+          </button>
+        </div>
+
+        <div class="scan-progress" x-show="scanProgress.active">
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              :style="`width: ${scanProgress.percent}%`"
+            ></div>
+          </div>
+          <div class="progress-text">
+            <span x-text="scanProgress.message"></span>
+            <span
+              x-text="`${scanProgress.current}/${scanProgress.total}`"
+            ></span>
           </div>
         </div>
       </div>
@@ -254,7 +408,7 @@
         ></span>
       </div>
       <div
-        x-text="models.length + ' models loaded • ' + models.filter(m => m.has_notes).length + ' with custom notes'"
+        x-text="(models?.length || 0) + ' models loaded • ' + (models || []).filter(m => m?.has_notes).length + ' with custom notes'"
       ></div>
     </div>
 
