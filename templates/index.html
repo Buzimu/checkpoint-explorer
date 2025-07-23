@@ -314,10 +314,14 @@
       x-transition:leave-to="fade-leave-to"
       @click.self="closeSettings()"
     >
-      <div class="modal-content" @click.stop>
+      <div class="modal-content" @click.stop="">
         <div class="modal-header">
           <h3>⚙️ Settings</h3>
-          <button type="button" class="modal-close" @click="closeSettings()">
+          <button
+            type="button"
+            class="modal-close"
+            @click.prevent="closeSettings()"
+          >
             ×
           </button>
         </div>
@@ -330,28 +334,27 @@
                 type="text"
                 class="setting-input"
                 x-model="settingsForm.models_directory"
-                placeholder="e.g., C:\ComfyUI\models or /path/to/comfyui/models"
-                @keydown.enter="saveSettings()"
+                placeholder="e.g., S:\AI\Image Models\models"
+                @keydown.enter.prevent="saveSettings()"
               />
               <button
                 type="button"
                 class="btn btn-secondary"
-                @click="browseDirectory()"
+                @click.prevent="browseDirectory()"
               >
                 📂 Browse
               </button>
             </div>
             <small class="setting-help">
-              Point to your ComfyUI models directory (should contain subfolders
-              like 'checkpoints', 'loras', 'vae', etc.)
+              Enter the full path to your ComfyUI models directory (should
+              contain subfolders like 'checkpoints', 'loras', 'vae', etc.)
             </small>
           </div>
 
           <div class="setting-group">
             <label class="setting-checkbox">
               <input type="checkbox" x-model="settingsForm.auto_scan" />
-              <span class="checkmark"></span>
-              Auto-scan on startup
+              <span>Auto-scan on startup</span>
             </label>
             <small class="setting-help">
               Automatically scan for new models when the app starts
@@ -361,8 +364,7 @@
           <div class="setting-group">
             <label class="setting-checkbox">
               <input type="checkbox" x-model="settingsForm.show_examples" />
-              <span class="checkmark"></span>
-              Show example images
+              <span>Show example images</span>
             </label>
             <small class="setting-help">
               Display example images in model details (when available)
@@ -371,15 +373,21 @@
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="closeSettings()">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            @click.prevent="closeSettings()"
+          >
             Cancel
           </button>
           <button
+            type="button"
             class="btn btn-primary"
-            @click="saveSettings()"
-            :disabled="!settingsForm.models_directory"
+            @click.prevent="saveSettings()"
+            :disabled="!settingsForm.models_directory || !settingsForm.models_directory.trim()"
           >
-            Save & Scan Models
+            <span x-show="!scanProgress.active">Save & Scan Models</span>
+            <span x-show="scanProgress.active">Scanning...</span>
           </button>
         </div>
 
@@ -392,9 +400,7 @@
           </div>
           <div class="progress-text">
             <span x-text="scanProgress.message"></span>
-            <span
-              x-text="`${scanProgress.current}/${scanProgress.total}`"
-            ></span>
+            <span x-text="`${scanProgress.percent}%`"></span>
           </div>
         </div>
       </div>

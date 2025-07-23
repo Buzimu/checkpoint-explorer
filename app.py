@@ -284,7 +284,11 @@ def api_model_notes(model_id):
 @app.route('/favicon.ico')
 def favicon():
     """Handle favicon requests"""
-    return '', 204  # No content
+    # Return a simple response to avoid 500 errors
+    from flask import make_response
+    response = make_response()
+    response.status_code = 204  # No Content
+    return response
 
 @app.errorhandler(404)
 def not_found(error):
@@ -295,6 +299,97 @@ def not_found(error):
 def internal_error(error):
     """Handle 500 errors"""
     return jsonify({'error': 'Internal server error'}), 500
+
+
+# Add these enhancements to your existing app.py
+
+@app.route('/api/scan_progress')
+def api_scan_progress():
+    """API endpoint to get scan progress (for future WebSocket implementation)"""
+    return jsonify({
+        'status': 'idle',  # or 'scanning', 'complete', 'error'
+        'progress': 0,
+        'current_file': '',
+        'total_files': 0,
+        'processed_files': 0
+    })
+
+@app.route('/api/validate_directory', methods=['POST'])
+def api_validate_directory():
+    """Validate a directory before scanning"""
+    try:
+        data = request.get_json() or {}
+        directory = data.get('directory', '').strip()
+        
+        if not directory:
+            return jsonify({'valid': False, 'message': 'Directory path is required'})
+        
+        if not os.path.exists(directory):
+            return jsonify({'valid': False, 'message': 'Directory does not exist'})
+        
+        if not os.path.isdir(directory):
+            return jsonify({'valid': False, 'message': 'Path is not a directory'})
+        
+        # Quick check for model files
+        scanner = FileScanner()
+        quick_count = 0
+        for root, dirs, files in os.walk(directory):
+            for file in files[:50]:  # Only check first 50 files for speed
+                if any(file.lower().endswith(ext) for ext in scanner.SUPPORTED_EXTENSIONS):
+                    quick_count += 1
+                    if quick_count >= 5:  # Found enough to confirm it's a models directory
+                        break
+            if quick_count >= 5:
+                break
+        
+        if quick_count == 0:
+            return jsonify({
+                'valid': True, 
+                'message': 'Directory exists but no model files found. This might not be a models directory.',
+                'warning': True
+            })
+        
+        return jsonify({
+            'valid': True, 
+            'message': f'Directory looks good! Found {quick_count}+ model files.',
+            'estimated_models': quick_count
+        })
+        
+    except Exception as e:
+        return jsonify({'valid': False, 'message': f'Error validating directory: {str(e)}'})
+
+@app.route('/api/models/refresh')
+def api_refresh_models():
+    """Force refresh models from current directory"""
+    try:
+        if not app_settings['models_directory']:
+            return jsonify({'status': 'error', 'message': 'No models directory configured'}), 400
+        
+        models = scan_models_directory()
+        return jsonify({
+            'status': 'success',
+            'models_found': len(models),
+            'message': 'Models refreshed successfully'
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# Enhanced model type filter endpoint
+@app.route('/api/model_types')
+def api_model_types():
+    """Get available model types and their counts"""
+    type_counts = {}
+    for model in current_models:
+        model_type = model.get('type', 'Unknown')
+        type_counts[model_type] = type_counts.get(model_type, 0) + 1
+    
+    return jsonify({
+        'types': type_counts,
+        'total': len(current_models)
+    })
+
+
+
 
 def initialize_app():
     """Initialize app with settings and initial scan"""

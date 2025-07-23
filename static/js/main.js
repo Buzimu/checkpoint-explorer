@@ -155,25 +155,56 @@ function modelExplorer() {
       }
     },
 
+    // Replace the settings-related functions in your main.js with these fixed versions
+
     // Settings functions
+
     openSettings() {
       this.showSettings = true;
-      console.log("⚙️ Opening settings");
+      console.log(
+        "⚙️ Opening settings - showSettings is now:",
+        this.showSettings
+      );
+
+      // Focus the directory input after modal opens
+      setTimeout(() => {
+        const input = document.querySelector(".setting-input");
+        if (input) {
+          input.focus();
+        }
+      }, 100);
     },
 
+    // Replace the closeSettings function in your main.js with this version that includes direct DOM manipulation
+
     closeSettings() {
+      console.log("⚙️ Closing settings");
       this.showSettings = false;
       this.scanProgress.active = false;
       this.scanProgress.percent = 0;
-      console.log("⚙️ Closing settings");
+      this.scanProgress.message = "Initializing scan...";
+
+      // Force hide modal with direct DOM manipulation as backup
+      setTimeout(() => {
+        const modal = document.querySelector(".modal-overlay");
+        if (modal && window.getComputedStyle(modal).display !== "none") {
+          console.log("🔧 Alpine.js not hiding modal, forcing with CSS");
+          modal.style.display = "none";
+        }
+      }, 100);
     },
 
     async saveSettings() {
-      try {
-        console.log("💾 Saving settings:", this.settingsForm);
+      console.log("💾 Save Settings clicked!");
+      console.log("Current settings form:", this.settingsForm);
 
+      try {
         // Validate directory path
-        if (!this.settingsForm.models_directory.trim()) {
+        if (
+          !this.settingsForm.models_directory ||
+          !this.settingsForm.models_directory.trim()
+        ) {
+          console.log("❌ No directory path provided");
           this.showNotification(
             "Please enter a models directory path",
             "error"
@@ -181,6 +212,7 @@ function modelExplorer() {
           return;
         }
 
+        console.log("📡 Sending settings to server...");
         this.scanProgress.active = true;
         this.scanProgress.message = "Saving settings...";
         this.scanProgress.percent = 10;
@@ -193,18 +225,18 @@ function modelExplorer() {
           body: JSON.stringify(this.settingsForm),
         });
 
-        console.log("📡 Settings API response status:", response.status);
+        console.log("📡 Settings response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error("❌ Settings API error:", errorText);
+          console.error("❌ Settings error response:", errorText);
           throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
 
         const result = await response.json();
-        console.log("✅ Settings saved:", result);
+        console.log("✅ Settings saved successfully:", result);
 
-        this.showNotification("Settings saved successfully!", "success");
+        this.showNotification("Settings saved! Starting scan...", "success");
 
         // Trigger scan
         await this.scanModels();
@@ -219,13 +251,8 @@ function modelExplorer() {
     },
 
     async scanModels() {
+      console.log("🔍 Scan Models started!");
       try {
-        console.log(
-          "🔍 Starting scan for directory:",
-          this.settingsForm.models_directory
-        );
-
-        this.scanProgress.active = true;
         this.scanProgress.message = "Scanning models directory...";
         this.scanProgress.percent = 25;
 
@@ -239,11 +266,11 @@ function modelExplorer() {
           }),
         });
 
-        console.log("📡 Scan API response status:", response.status);
+        console.log("📡 Scan response status:", response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error("❌ Scan API error:", errorText);
+          console.error("❌ Scan error response:", errorText);
           throw new Error(`Scan failed: ${response.status} - ${errorText}`);
         }
 
@@ -251,7 +278,7 @@ function modelExplorer() {
         console.log("✅ Scan completed:", result);
 
         this.scanProgress.percent = 75;
-        this.scanProgress.message = "Loading models...";
+        this.scanProgress.message = "Loading models into UI...";
 
         // Reload models
         await this.loadModels();
@@ -264,14 +291,9 @@ function modelExplorer() {
           "success"
         );
 
-        // Close settings and hide progress after delay
+        // Close settings after successful scan
         setTimeout(() => {
           this.closeSettings();
-        }, 1000);
-
-        setTimeout(() => {
-          this.scanProgress.active = false;
-          this.scanProgress.percent = 0;
         }, 2000);
       } catch (error) {
         console.error("❌ Scan failed:", error);
@@ -281,23 +303,98 @@ function modelExplorer() {
     },
 
     browseDirectory() {
-      // Provide helpful path suggestions since we can't open a file browser in web app
-      const suggestions = [
-        "Windows: C:\\ComfyUI\\models",
-        "Windows: C:\\stable-diffusion-webui\\models",
-        "Mac/Linux: /path/to/ComfyUI/models",
-        "Mac/Linux: ~/ComfyUI/models",
-      ];
+      console.log("📂 Browse Directory clicked!");
 
-      const message =
-        "File browser not available in web version.\n\nCommon paths:\n" +
-        suggestions.join("\n");
-      alert(message);
+      // Since web apps can't open native file browsers, provide helpful guidance
+      const isWindows = navigator.platform.includes("Win");
+      const examples = isWindows
+        ? [
+            "Windows Examples:",
+            "C:\\ComfyUI\\models",
+            "D:\\AI\\ComfyUI\\models",
+            "S:\\AI\\Image Models\\models",
+            "",
+            "Your path should contain subdirectories like:",
+            "- checkpoints/",
+            "- loras/",
+            "- vae/",
+            "- controlnet/",
+          ]
+        : [
+            "Mac/Linux Examples:",
+            "/Users/username/ComfyUI/models",
+            "/home/username/comfyui/models",
+            "~/ComfyUI/models",
+            "",
+            "Your path should contain subdirectories like:",
+            "- checkpoints/",
+            "- loras/",
+            "- vae/",
+            "- controlnet/",
+          ];
 
-      // Focus the input field
-      const input = document.querySelector(".setting-input");
-      if (input) {
-        input.focus();
+      // Show helpful dialog
+      alert(
+        "Web apps cannot open file browsers.\n\nPlease manually enter your ComfyUI models directory path.\n\n" +
+          examples.join("\n")
+      );
+
+      // Focus and select the input field
+      setTimeout(() => {
+        const input = document.querySelector(".setting-input");
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }, 100);
+    },
+
+    // Enhanced keyboard shortcuts that work in modal
+    handleKeydown(event) {
+      // Escape key - close modal or clear search
+      if (event.key === "Escape") {
+        if (this.showSettings) {
+          this.closeSettings();
+          return;
+        } else if (this.searchQuery) {
+          this.searchQuery = "";
+          this.filterModels();
+        } else {
+          this.selectedModel = null;
+        }
+      }
+
+      // Don't handle other shortcuts if modal is open
+      if (this.showSettings) {
+        // Enter key in modal - save settings
+        if (
+          event.key === "Enter" &&
+          event.target.classList.contains("setting-input")
+        ) {
+          event.preventDefault();
+          this.saveSettings();
+        }
+        return;
+      }
+
+      // F2 - Edit notes
+      if (event.key === "F2" && this.selectedModel) {
+        this.editNotes();
+      }
+
+      // Ctrl+F - Focus search
+      if (event.ctrlKey && event.key === "f") {
+        event.preventDefault();
+        const searchBox = document.querySelector(".search-box");
+        if (searchBox) {
+          searchBox.focus();
+        }
+      }
+
+      // Arrow keys for model navigation
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        this.navigateModels(event.key === "ArrowDown" ? 1 : -1);
       }
     },
 
@@ -544,6 +641,121 @@ function modelExplorer() {
         this.selectModel(this.filteredModels[newIndex]);
       }
     },
+
+    // Add these methods to your modelExplorer() function
+
+    // Directory validation before scanning
+    async validateDirectory() {
+      if (!this.settingsForm.models_directory.trim()) {
+        return false;
+      }
+
+      try {
+        const response = await fetch("/api/validate_directory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            directory: this.settingsForm.models_directory,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.valid) {
+          this.showNotification(result.message, "error");
+          return false;
+        }
+
+        if (result.warning) {
+          this.showNotification(result.message, "warning");
+        } else {
+          this.showNotification(result.message, "success");
+        }
+
+        return true;
+      } catch (error) {
+        this.showNotification("Failed to validate directory", "error");
+        return false;
+      }
+    },
+
+    // Enhanced save settings with validation
+    async saveSettings() {
+      try {
+        console.log("💾 Saving settings:", this.settingsForm);
+
+        // Validate directory first
+        const isValid = await this.validateDirectory();
+        if (!isValid) {
+          return;
+        }
+
+        this.scanProgress.active = true;
+        this.scanProgress.message = "Saving settings...";
+        this.scanProgress.percent = 10;
+
+        const response = await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(this.settingsForm),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("✅ Settings saved:", result);
+
+        this.showNotification("Settings saved successfully!", "success");
+
+        // Trigger scan
+        await this.scanModels();
+      } catch (error) {
+        console.error("❌ Failed to save settings:", error);
+        this.showNotification(
+          `Failed to save settings: ${error.message}`,
+          "error"
+        );
+        this.scanProgress.active = false;
+      }
+    },
+
+    // Quick refresh models button
+    async refreshModels() {
+      try {
+        this.loading = true;
+        const response = await fetch("/api/models/refresh");
+        const result = await response.json();
+
+        if (result.status === "success") {
+          await this.loadModels();
+          this.showNotification(
+            `Refreshed! Found ${result.models_found} models.`,
+            "success"
+          );
+        } else {
+          this.showNotification(result.message, "error");
+        }
+      } catch (error) {
+        this.showNotification("Failed to refresh models", "error");
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    // Better file size formatting
+    formatFileSize(bytes) {
+      if (!bytes) return "Unknown";
+
+      const sizes = ["B", "KB", "MB", "GB", "TB"];
+      if (bytes === 0) return "0 B";
+
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      const size = (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1);
+      return `${size} ${sizes[i]}`;
+    },
   };
 }
 
@@ -573,3 +785,129 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Export for global access if needed
 window.modelExplorer = modelExplorer;
+
+// Manual event binding for modal buttons (workaround for Alpine.js issue)
+document.addEventListener("DOMContentLoaded", function () {
+  console.log("🔧 Setting up manual event listeners...");
+
+  // Function to get the Alpine component data
+  function getAppData() {
+    const appContainer = document.querySelector('[x-data="modelExplorer()"]');
+    return appContainer && appContainer._x_dataStack
+      ? appContainer._x_dataStack[0]
+      : null;
+  }
+
+  // Set up event listeners with a delay to ensure modal exists
+  function setupModalEvents() {
+    const app = getAppData();
+    if (!app) {
+      console.log("App not ready, retrying in 500ms...");
+      setTimeout(setupModalEvents, 500);
+      return;
+    }
+
+    // Close button (X)
+    const closeButton = document.querySelector(".modal-close");
+    if (closeButton) {
+      closeButton.addEventListener("click", function (e) {
+        e.preventDefault();
+        console.log("Manual close button clicked!");
+        app.closeSettings();
+      });
+      console.log("✅ Close button event listener added");
+    }
+
+    // Cancel button
+    const cancelButton = document.querySelector(".modal-footer .btn-secondary");
+    if (cancelButton) {
+      cancelButton.addEventListener("click", function (e) {
+        e.preventDefault();
+        console.log("Manual cancel button clicked!");
+        app.closeSettings();
+      });
+      console.log("✅ Cancel button event listener added");
+    }
+
+    // Save & Scan button
+    const saveButton = document.querySelector(".modal-footer .btn-primary");
+    if (saveButton) {
+      saveButton.addEventListener("click", function (e) {
+        e.preventDefault();
+        console.log("Manual save button clicked!");
+        app.saveSettings();
+      });
+      console.log("✅ Save button event listener added");
+    }
+
+    // Browse button
+    const browseButton = document.querySelector(
+      ".directory-input-group .btn-secondary"
+    );
+    if (browseButton) {
+      browseButton.addEventListener("click", function (e) {
+        e.preventDefault();
+        console.log("Manual browse button clicked!");
+        app.browseDirectory();
+      });
+      console.log("✅ Browse button event listener added");
+    }
+
+    // Modal overlay click to close
+    const modalOverlay = document.querySelector(".modal-overlay");
+    if (modalOverlay) {
+      modalOverlay.addEventListener("click", function (e) {
+        if (e.target === modalOverlay) {
+          console.log("Manual overlay click!");
+          app.closeSettings();
+        }
+      });
+      console.log("✅ Modal overlay event listener added");
+    }
+
+    // ESC key to close
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && app.showSettings) {
+        console.log("Manual ESC key pressed!");
+        app.closeSettings();
+      }
+    });
+    console.log("✅ ESC key event listener added");
+  }
+
+  // Set up events immediately and also when modal opens
+  setupModalEvents();
+
+  // Also set up events whenever the modal becomes visible
+  const observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (mutation) {
+      if (
+        mutation.type === "attributes" &&
+        mutation.attributeName === "style"
+      ) {
+        const modal = document.querySelector(".modal-overlay");
+        if (modal && window.getComputedStyle(modal).display !== "none") {
+          setupModalEvents();
+        }
+      }
+    });
+  });
+
+  const modal = document.querySelector(".modal-overlay");
+  if (modal) {
+    observer.observe(modal, { attributes: true });
+  }
+});
+
+// Also add this CSS to prevent modal from blocking events
+const style = document.createElement("style");
+style.textContent = `
+  .modal-content {
+    pointer-events: auto !important;
+  }
+  .modal-content button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+  }
+`;
+document.head.appendChild(style);
