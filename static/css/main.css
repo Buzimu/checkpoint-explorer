@@ -12,6 +12,11 @@ body {
     overflow: hidden;
 }
 
+/* Prevent flash of unstyled content */
+[x-cloak] {
+    display: none !important;
+}
+
 .app-container {
     display: flex;
     height: 100vh;

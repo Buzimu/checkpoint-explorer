@@ -157,3 +157,5 @@ yarn-error.log*
 # loras/
 # vae/
 # controlnet/
+
+*.md
