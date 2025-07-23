@@ -1,0 +1,159 @@
+# ComfyUI Model Explorer - Git Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+.ENV/
+
+# Flask
+instance/
+.webassets-cache
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+flask.log
+
+# Cache and Temporary Files
+.cache/
+.tmp/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Model Files (Large Files - Optional)
+# Uncomment these if you don't want to track actual model files
+# *.safetensors
+# *.ckpt
+# *.pt
+# *.pth
+# *.bin
+
+# User Data and Config
+config.json
+settings.json
+user_data/
+data/models/
+data/cache/
+
+# Generated Files
+static/uploads/
+static/thumbnails/
+static/generated/
+backups/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation Build
+docs/_build/
+site/
+
+# Package Manager
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller (for desktop builds)
+*.manifest
+*.spec
+build/
+dist/
+
+# Jupyter Notebooks (if used for development)
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Operating System
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ComfyUI Specific
+# Add any ComfyUI-specific files you don't want to track
+comfyui_logs/
+workflow_cache/
+
+# Development and Debug
+debug.log
+error.log
+app.log
+*.pid
+
+# Backup Files
+*.bak
+*.backup
+*~
+
+# Node.js (if using for any frontend tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Optional: Exclude large model directories if linking to existing ComfyUI installation
+# models/
+# checkpoints/
+# loras/
+# vae/
+# controlnet/
