@@ -1532,3 +1532,343 @@ setTimeout(() => {
 
   console.log("✅ Button fixes applied");
 }, 1000);
+
+// COMPREHENSIVE BUTTON FIX FOR COMFYUI MODEL EXPLORER
+// Add this to the END of your main.js file to fix all button events
+
+// Store app reference globally for easier access
+window.appInstance = null;
+
+// Enhanced function to get Alpine.js app data
+function getAppData() {
+  try {
+    // Try window reference first
+    if (window.appInstance) {
+      return window.appInstance;
+    }
+
+    // Try Alpine.js container
+    const container = document.querySelector('[x-data="modelExplorer()"]');
+    if (container && container._x_dataStack && container._x_dataStack[0]) {
+      window.appInstance = container._x_dataStack[0];
+      return window.appInstance;
+    }
+
+    // Try alternative Alpine.js access
+    if (window.Alpine && container) {
+      const data = window.Alpine.$data(container);
+      if (data) {
+        window.appInstance = data;
+        return window.appInstance;
+      }
+    }
+  } catch (e) {
+    console.warn("⚠️ Error accessing app data:", e);
+  }
+
+  return null;
+}
+
+// Manual event handlers that work independently of Alpine.js
+const manualEventHandlers = {
+  // Settings Modal Functions
+  openSettings() {
+    console.log("🔧 Manual openSettings() called");
+    const app = getAppData();
+    if (app && app.openSettings) {
+      app.openSettings();
+    } else {
+      // Direct DOM manipulation fallback
+      const modal = document.querySelector(".modal-overlay");
+      if (modal) {
+        modal.style.display = "flex";
+        console.log("🔧 Opened settings modal via DOM");
+      }
+    }
+  },
+
+  closeSettings() {
+    console.log("🔧 Manual closeSettings() called");
+    const app = getAppData();
+    if (app && app.closeSettings) {
+      app.closeSettings();
+    } else {
+      // Direct DOM manipulation fallback
+      const modal = document.querySelector(".modal-overlay");
+      if (modal) {
+        modal.style.display = "none";
+        console.log("🔧 Closed settings modal via DOM");
+      }
+    }
+  },
+
+  saveSettings() {
+    console.log("🔧 Manual saveSettings() called");
+    const app = getAppData();
+    if (app && app.saveSettings) {
+      app.saveSettings();
+    } else {
+      console.error("❌ Cannot save settings - app data not available");
+      alert("Unable to save settings. Please refresh the page and try again.");
+    }
+  },
+
+  browseDirectory() {
+    console.log("🔧 Manual browseDirectory() called");
+    const app = getAppData();
+    if (app && app.browseDirectory) {
+      app.browseDirectory();
+    } else {
+      // Fallback directory guidance
+      const isWindows = navigator.platform.includes("Win");
+      const examples = isWindows
+        ? "Windows Examples:\nC:\\ComfyUI\\models\nD:\\AI\\ComfyUI\\models\nS:\\AI\\Image Models\\models"
+        : "Mac/Linux Examples:\n/Users/username/ComfyUI/models\n/home/username/comfyui/models\n~/ComfyUI/models";
+
+      alert(
+        "Manual directory browser:\n\n" +
+          examples +
+          "\n\nPlease enter your ComfyUI models directory path in the text field."
+      );
+
+      const input = document.querySelector(".setting-input");
+      if (input) {
+        input.focus();
+      }
+    }
+  },
+
+  // Notes Editor Functions
+  editNotes() {
+    console.log("🔧 Manual editNotes() called");
+    const app = getAppData();
+    if (app && app.editNotes) {
+      app.editNotes();
+    } else {
+      console.error("❌ Cannot open notes editor - app data not available");
+      alert(
+        "Unable to open notes editor. Please refresh the page and try again."
+      );
+    }
+  },
+
+  closeNotesEditor() {
+    console.log("🔧 Manual closeNotesEditor() called");
+    const app = getAppData();
+    if (app && app.closeNotesEditor) {
+      app.closeNotesEditor();
+    } else {
+      // Direct DOM manipulation fallback
+      const modal = document.querySelector(".notes-editor-modal");
+      if (modal) {
+        modal.style.display = "none";
+        console.log("🔧 Closed notes modal via DOM");
+      }
+    }
+  },
+
+  saveAndCloseNotes() {
+    console.log("🔧 Manual saveAndCloseNotes() called");
+    const app = getAppData();
+    if (app && app.saveAndCloseNotes) {
+      app.saveAndCloseNotes();
+    } else {
+      console.error("❌ Cannot save notes - app data not available");
+      alert("Unable to save notes. Please refresh the page and try again.");
+    }
+  },
+};
+
+// Enhanced button event binding
+function bindButtonEvents() {
+  console.log("🔧 Binding manual button events...");
+
+  // Settings Modal Buttons - using valid CSS selectors only
+  const settingsButtons = [
+    {
+      selector: ".modal-overlay .modal-close",
+      action: "closeSettings",
+      event: "click",
+    },
+    {
+      selector: ".modal-footer .btn-secondary",
+      action: "closeSettings",
+      event: "click",
+    },
+    {
+      selector: ".modal-footer .btn-primary",
+      action: "saveSettings",
+      event: "click",
+    },
+    {
+      selector: ".directory-input-group .btn-secondary",
+      action: "browseDirectory",
+      event: "click",
+    },
+  ];
+
+  // Notes Editor Buttons
+  const notesButtons = [
+    {
+      selector: ".notes-editor-modal .modal-close",
+      action: "closeNotesEditor",
+      event: "click",
+    },
+    {
+      selector: ".notes-editor-footer .btn-secondary",
+      action: "closeNotesEditor",
+      event: "click",
+    },
+    {
+      selector: ".notes-editor-footer .btn-primary",
+      action: "saveAndCloseNotes",
+      event: "click",
+    },
+  ];
+
+  // Action Bar Buttons
+  const actionButtons = [
+    { selector: ".notes-empty .btn", action: "editNotes", event: "click" },
+  ];
+
+  // Combine all button configurations
+  const allButtons = [...settingsButtons, ...notesButtons, ...actionButtons];
+
+  // Bind events for each button type
+  allButtons.forEach(({ selector, action, event }) => {
+    try {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach((element) => {
+        if (!element._manualEventBound) {
+          element._manualEventBound = true;
+          element.addEventListener(event, function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`🔧 Manual ${action} triggered via ${selector}`);
+
+            if (manualEventHandlers[action]) {
+              manualEventHandlers[action]();
+            } else {
+              console.error(`❌ No handler found for action: ${action}`);
+            }
+          });
+          console.log(`✅ Bound ${action} to ${selector}`);
+        }
+      });
+    } catch (e) {
+      console.warn(`⚠️ Invalid selector: ${selector}`, e);
+    }
+  });
+
+  // Special handling for buttons that might contain text (more robust)
+  const textBasedButtons = [
+    { text: "Configure", action: "openSettings" },
+    { text: "Browse", action: "browseDirectory" },
+    { text: "Save & Scan", action: "saveSettings" },
+    { text: "Cancel", action: "closeSettings" },
+    { text: "Edit Notes", action: "editNotes" },
+    { text: "Add Notes", action: "editNotes" },
+  ];
+
+  textBasedButtons.forEach(({ text, action }) => {
+    const buttons = Array.from(
+      document.querySelectorAll("button, .btn")
+    ).filter((btn) => btn.textContent.includes(text) && !btn._manualEventBound);
+
+    buttons.forEach((btn) => {
+      btn._manualEventBound = true;
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log(`🔧 Manual ${action} triggered via text: ${text}`);
+
+        if (manualEventHandlers[action]) {
+          manualEventHandlers[action]();
+        }
+      });
+      console.log(`✅ Bound ${action} to button containing "${text}"`);
+    });
+  });
+
+  // Handle modal backdrop clicks
+  document.addEventListener("click", function (e) {
+    if (e.target.classList.contains("modal-overlay")) {
+      console.log("🔧 Modal backdrop clicked");
+      manualEventHandlers.closeSettings();
+    }
+    if (e.target.classList.contains("notes-editor-modal")) {
+      console.log("🔧 Notes modal backdrop clicked");
+      manualEventHandlers.closeNotesEditor();
+    }
+  });
+
+  // Handle Enter key in settings input
+  const settingsInput = document.querySelector(".setting-input");
+  if (settingsInput && !settingsInput._enterBound) {
+    settingsInput._enterBound = true;
+    settingsInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        console.log("🔧 Enter pressed in settings input");
+        manualEventHandlers.saveSettings();
+      }
+    });
+    console.log("✅ Bound Enter key to settings input");
+  }
+
+  console.log("✅ Manual button events bound successfully");
+}
+
+// Setup function that runs after DOM is loaded
+function initializeButtonFixes() {
+  console.log("🚀 Initializing button fixes...");
+
+  // Bind events immediately
+  bindButtonEvents();
+
+  // Re-bind events periodically for dynamic content
+  setInterval(bindButtonEvents, 2000);
+
+  // Re-bind when Alpine.js is ready
+  if (window.Alpine) {
+    window.Alpine.nextTick(() => {
+      setTimeout(bindButtonEvents, 500);
+    });
+  }
+
+  // Make functions globally available for testing
+  window.manualEventHandlers = manualEventHandlers;
+  window.bindButtonEvents = bindButtonEvents;
+  window.getAppData = getAppData;
+
+  console.log("✅ Button fix system initialized");
+  console.log(
+    "💡 Available manual functions:",
+    Object.keys(manualEventHandlers)
+  );
+}
+
+// Initialize when DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeButtonFixes);
+} else {
+  initializeButtonFixes();
+}
+
+// Also initialize when Alpine.js loads
+document.addEventListener("alpine:init", () => {
+  console.log("🎨 Alpine.js initialized, setting up button fixes...");
+  setTimeout(initializeButtonFixes, 1000);
+});
+
+// Emergency manual functions for console testing
+window.emergencyOpenSettings = () => manualEventHandlers.openSettings();
+window.emergencyCloseSettings = () => manualEventHandlers.closeSettings();
+window.emergencySaveSettings = () => manualEventHandlers.saveSettings();
+window.emergencyEditNotes = () => manualEventHandlers.editNotes();
+
+console.log("🔧 Emergency functions available:");
+console.log("   window.emergencyOpenSettings()");
+console.log("   window.emergencyCloseSettings()");
+console.log("   window.emergencySaveSettings()");
+console.log("   window.emergencyEditNotes()");
