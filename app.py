@@ -36,143 +36,143 @@ class NotesService:
     TEMPLATES = {
         'checkpoint': '''# {model_name}
 
-## Model Information
-- **Type:** Checkpoint Model
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **Resolution:** 512x512 / 768x768 / 1024x1024
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** Checkpoint Model
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **Resolution:** 512x512 / 768x768 / 1024x1024
+        - **File Size:** {file_size}
 
-## Recommended Settings
-- **Sampler:** DPM++ 2M Karras
-- **Steps:** 20-30
-- **CFG Scale:** 7-9
-- **Clip Skip:** 1-2
+        ## Recommended Settings
+        - **Sampler:** DPM++ 2M Karras
+        - **Steps:** 20-30
+        - **CFG Scale:** 7-9
+        - **Clip Skip:** 1-2
 
-## Usage Notes
-- **Best for:** [Describe what this model excels at]
-- **Style:** [Artistic style or theme]
-- **Trigger Words:** [Any specific trigger words]
+        ## Usage Notes
+        - **Best for:** [Describe what this model excels at]
+        - **Style:** [Artistic style or theme]
+        - **Trigger Words:** [Any specific trigger words]
 
-## My Experience
-- **Quality:** ⭐⭐⭐⭐⭐
-- **Ease of Use:** ⭐⭐⭐⭐⭐
-- **Notes:** [Your personal notes and findings]
+        ## My Experience
+        - **Quality:** ⭐⭐⭐⭐⭐
+        - **Ease of Use:** ⭐⭐⭐⭐⭐
+        - **Notes:** [Your personal notes and findings]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'lora': '''# {model_name}
+                'lora': '''# {model_name}
 
-## Model Information
-- **Type:** LoRA (Low-Rank Adaptation)
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **Trigger Weight:** 0.5 - 1.0
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** LoRA (Low-Rank Adaptation)
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **Trigger Weight:** 0.5 - 1.0
+        - **File Size:** {file_size}
 
-## Usage Instructions
-- **Trigger Words:** [Required trigger words]
-- **Recommended Weight:** 0.7-0.8
-- **Best Prompts:** [Example prompts that work well]
+        ## Usage Instructions
+        - **Trigger Words:** [Required trigger words]
+        - **Recommended Weight:** 0.7-0.8
+        - **Best Prompts:** [Example prompts that work well]
 
-## Settings
-- **Works well with:** [Compatible checkpoints]
-- **Avoid:** [Incompatible models or settings]
+        ## Settings
+        - **Works well with:** [Compatible checkpoints]
+        - **Avoid:** [Incompatible models or settings]
 
-## Examples
-- [Add your successful prompt examples here]
+        ## Examples
+        - [Add your successful prompt examples here]
 
-## My Notes
-- **Quality:** ⭐⭐⭐⭐⭐
-- **Versatility:** ⭐⭐⭐⭐⭐
-- **Personal Notes:** [Your experience and tips]
+        ## My Notes
+        - **Quality:** ⭐⭐⭐⭐⭐
+        - **Versatility:** ⭐⭐⭐⭐⭐
+        - **Personal Notes:** [Your experience and tips]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'vae': '''# {model_name}
+                'vae': '''# {model_name}
 
-## Model Information
-- **Type:** VAE (Variational Autoencoder)
-- **Compatible with:** SD 1.5 / SD 2.1 / SDXL
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** VAE (Variational Autoencoder)
+        - **Compatible with:** SD 1.5 / SD 2.1 / SDXL
+        - **File Size:** {file_size}
 
-## Purpose & Usage
-- **Improves:** [Color accuracy, detail, contrast, etc.]
-- **Best for:** [Types of images this VAE works best with]
-- **Comparison:** [How it compares to other VAEs]
+        ## Purpose & Usage
+        - **Improves:** [Color accuracy, detail, contrast, etc.]
+        - **Best for:** [Types of images this VAE works best with]
+        - **Comparison:** [How it compares to other VAEs]
 
-## Technical Notes
-- **Resolution:** [Optimal resolution settings]
-- **Performance:** [Impact on generation speed]
-- **Memory Usage:** [VRAM requirements]
+        ## Technical Notes
+        - **Resolution:** [Optimal resolution settings]
+        - **Performance:** [Impact on generation speed]
+        - **Memory Usage:** [VRAM requirements]
 
-## My Experience
-- **Visual Quality:** ⭐⭐⭐⭐⭐
-- **Performance Impact:** ⭐⭐⭐⭐⭐
-- **Notes:** [Your observations and comparisons]
+        ## My Experience
+        - **Visual Quality:** ⭐⭐⭐⭐⭐
+        - **Performance Impact:** ⭐⭐⭐⭐⭐
+        - **Notes:** [Your observations and comparisons]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'controlnet': '''# {model_name}
+                'controlnet': '''# {model_name}
 
-## Model Information
-- **Type:** ControlNet
-- **Control Type:** [Canny, Depth, OpenPose, etc.]
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** ControlNet
+        - **Control Type:** [Canny, Depth, OpenPose, etc.]
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **File Size:** {file_size}
 
-## Usage Settings
-- **Control Weight:** 0.8-1.2
-- **Starting Step:** 0
-- **Ending Step:** 1.0
-- **Preprocessor:** [Required preprocessor]
+        ## Usage Settings
+        - **Control Weight:** 0.8-1.2
+        - **Starting Step:** 0
+        - **Ending Step:** 1.0
+        - **Preprocessor:** [Required preprocessor]
 
-## Best Use Cases
-- [Describe what this ControlNet is best for]
-- [Mention any specific scenarios]
+        ## Best Use Cases
+        - [Describe what this ControlNet is best for]
+        - [Mention any specific scenarios]
 
-## Tips & Tricks
-- [Your personal tips for using this ControlNet]
-- [Common issues and solutions]
+        ## Tips & Tricks
+        - [Your personal tips for using this ControlNet]
+        - [Common issues and solutions]
 
-## My Experience
-- **Accuracy:** ⭐⭐⭐⭐⭐
-- **Ease of Use:** ⭐⭐⭐⭐⭐
-- **Notes:** [Your findings and recommendations]
+        ## My Experience
+        - **Accuracy:** ⭐⭐⭐⭐⭐
+        - **Ease of Use:** ⭐⭐⭐⭐⭐
+        - **Notes:** [Your findings and recommendations]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'embedding': '''# {model_name}
+                'embedding': '''# {model_name}
 
-## Model Information
-- **Type:** Textual Inversion / Embedding
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **Vectors:** [Number of vectors]
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** Textual Inversion / Embedding
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **Vectors:** [Number of vectors]
+        - **File Size:** {file_size}
 
-## Usage Instructions
-- **Trigger Word:** {model_name}
-- **Placement:** [Beginning, end, or middle of prompt]
-- **Weight:** Usually 1.0 (can be adjusted)
+        ## Usage Instructions
+        - **Trigger Word:** {model_name}
+        - **Placement:** [Beginning, end, or middle of prompt]
+        - **Weight:** Usually 1.0 (can be adjusted)
 
-## Purpose
-- **Effect:** [What this embedding does]
-- **Style:** [Artistic style or effect it provides]
+        ## Purpose
+        - **Effect:** [What this embedding does]
+        - **Style:** [Artistic style or effect it provides]
 
-## Example Prompts
-```
-[Add your successful prompt examples here]
-```
+        ## Example Prompts
+        ```
+        [Add your successful prompt examples here]
+        ```
 
-## My Notes
-- **Effectiveness:** ⭐⭐⭐⭐⭐
-- **Versatility:** ⭐⭐⭐⭐⭐
-- **Personal Tips:** [Your experience and usage tips]
+        ## My Notes
+        - **Effectiveness:** ⭐⭐⭐⭐⭐
+        - **Versatility:** ⭐⭐⭐⭐⭐
+        - **Personal Tips:** [Your experience and usage tips]
 
----
-*Last updated: {date}*'''
+        ---
+        *Last updated: {date}*'''
     }
     
     def __init__(self):
@@ -584,45 +584,148 @@ def api_stats():
     
     return jsonify(stats)
 
-# Enhanced Notes API endpoints
-@app.route('/api/notes/<int:model_id>', methods=['GET', 'POST', 'PUT'])
-def api_model_notes_enhanced(model_id):
-    """Enhanced API endpoint for model notes with templates and versioning"""
-    model = next((m for m in current_models if m['id'] == model_id), None)
+# REPLACE the existing notes API endpoints in app.py with these:
+
+@app.route('/api/notes/<int:model_id>', methods=['GET', 'POST'])
+def api_model_notes_simple(model_id):
+    """Simple working notes API endpoint"""
+    print(f"📝 Notes API called for model ID: {model_id}")
+    
+    # Find the model
+    model = None
+    for m in current_models:
+        if m['id'] == model_id:
+            model = m
+            break
+    
+    if not model:
+        print(f"❌ Model {model_id} not found in current_models")
+        print(f"📊 Available model IDs: {[m['id'] for m in current_models[:5]]}")
+        return jsonify({'error': 'Model not found'}), 404
+    
+    print(f"✅ Found model: {model['name']} at path: {model['path']}")
+    
+    if request.method == 'GET':
+        # Load existing notes
+        try:
+            # Check if model already has notes in memory
+            existing_notes = model.get('notes', '')
+            has_notes = model.get('has_notes', False)
+            
+            print(f"📄 Model has notes in memory: {has_notes}, length: {len(existing_notes)}")
+            
+            # Also try to load from notes service
+            notes_result = notes_service.load_notes(model['path'])
+            
+            # Use notes service result if it has content, otherwise use memory
+            final_content = notes_result.get('content', '') or existing_notes
+            final_has_notes = bool(final_content.strip())
+            
+            result = {
+                'status': 'success',
+                'content': final_content,
+                'has_notes': final_has_notes,
+                'model_id': model_id,
+                'model_name': model['name'],
+                'model_type': model['type'],
+                'char_count': len(final_content),
+                'word_count': len(final_content.split()) if final_content.strip() else 0,
+                'file_path': notes_result.get('file_path', ''),
+                'last_modified': notes_result.get('last_modified'),
+                'available_templates': [
+                    {'id': 'checkpoint', 'name': 'Checkpoint Model', 'description': 'Standard template'},
+                    {'id': 'lora', 'name': 'LoRA Model', 'description': 'LoRA template'},
+                    {'id': 'vae', 'name': 'VAE Model', 'description': 'VAE template'},
+                    {'id': 'controlnet', 'name': 'ControlNet', 'description': 'ControlNet template'},
+                    {'id': 'embedding', 'name': 'Embedding', 'description': 'Embedding template'}
+                ],
+                'backups': []  # Simplified for now
+            }
+            
+            print(f"📤 Returning notes: {len(final_content)} characters, has_notes: {final_has_notes}")
+            return jsonify(result)
+            
+        except Exception as e:
+            print(f"❌ Error loading notes: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'status': 'error',
+                'message': str(e),
+                'content': '',
+                'has_notes': False,
+                'model_id': model_id,
+                'model_name': model['name']
+            }), 500
+    
+    elif request.method == 'POST':
+        # Save notes
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            content = data.get('content', '')
+            create_backup = data.get('create_backup', True)
+            
+            print(f"💾 Saving notes: {len(content)} characters")
+            
+            # Save using notes service
+            result = notes_service.save_notes(model['path'], content, create_backup)
+            
+            if result['status'] == 'success':
+                # Update model in memory
+                model['notes'] = content
+                model['has_notes'] = bool(content.strip())
+                print(f"✅ Notes saved and model updated in memory")
+            else:
+                print(f"⚠️ Notes service returned: {result}")
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            print(f"❌ Error saving notes: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'status': 'error',
+                'message': str(e)
+            }), 500
+
+@app.route('/api/notes/<int:model_id>/template/<template_type>')
+def api_get_note_template_simple(model_id, template_type):
+    """Get a formatted template for a specific model"""
+    print(f"📋 Template requested: {template_type} for model {model_id}")
+    
+    model = None
+    for m in current_models:
+        if m['id'] == model_id:
+            model = m
+            break
     
     if not model:
         return jsonify({'error': 'Model not found'}), 404
     
-    if request.method == 'GET':
-        # Load existing notes
-        result = notes_service.load_notes(model['path'])
+    try:
+        template_content = notes_service.get_template(
+            template_type, 
+            model['name'], 
+            model['size']
+        )
         
-        # Add additional metadata
-        result.update({
-            'model_id': model_id,
-            'model_name': model['name'],
-            'model_type': model['type'],
-            'available_templates': notes_service.get_available_templates(),
-            'backups': notes_service.get_backups(model['path'])
+        return jsonify({
+            'status': 'success',
+            'template_type': template_type,
+            'content': template_content,
+            'model_name': model['name']
         })
         
-        return jsonify(result)
-    
-    elif request.method in ['POST', 'PUT']:
-        # Save notes
-        data = request.get_json()
-        content = data.get('content', '')
-        create_backup = data.get('create_backup', True)
-        
-        result = notes_service.save_notes(model['path'], content, create_backup)
-        
-        if result['status'] == 'success':
-            # Update model in memory
-            model['notes'] = content
-            model['has_notes'] = bool(content.strip())
-        
-        return jsonify(result)
-
+    except Exception as e:
+        print(f"❌ Template error: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 @app.route('/api/notes/<int:model_id>/template/<template_type>')
 def api_get_note_template(model_id, template_type):
     """Get a formatted template for a specific model"""
