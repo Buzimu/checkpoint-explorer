@@ -4,20 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ComfyUI Model Explorer</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='css/main.css') }}"
-    />
+    <link rel="stylesheet" href="css/main.css" />
   </head>
   <body>
-    <div class="app-container" x-data="modelExplorer()" x-init="init()" x-cloak>
-      <div class="sidebar">
-        <div class="header">
-          <h1>🎨 ComfyUI Model Explorer</h1>
-          <div class="models-path">/models/checkpoints/</div>
-        </div>
+    <body>
+      <div class="app-container" id="app">
+        <div class="sidebar">
 
-        <div class="filter-section">
+            <div class="header">
+                <h1>🎨 ComfyUI Model Explorer</h1>
+                <div class="models-path" id="models-path">/models/checkpoints/</div>
+            </div>
+
+        <div class="filter-section" id="search-container">
           <input
             type="text"
             class="search-box"
@@ -64,7 +63,7 @@
           </div>
         </div>
 
-        <div class="models-list">
+        <div class="models-list" id="models-list">
           <template x-for="model in filteredModels" :key="model.id">
             <div
               class="model-item"
@@ -84,43 +83,36 @@
       </div>
 
       <div class="main-content">
-        <div class="top-bar">
-          <div
-            class="model-title"
-            x-text="selectedModel ? selectedModel.name : 'Select a Model'"
-          ></div>
-          <div class="action-buttons">
-            <template x-if="!selectedModel || models.length === 0">
-              <button class="btn btn-primary" @click="openSettings()">
-                ⚙️ Configure Models Directory
-              </button>
-            </template>
-            <template x-if="selectedModel">
-              <div style="display: flex; gap: 12px">
-                <a
-                  href="#"
-                  class="btn btn-secondary"
-                  @click.prevent="openFolder()"
-                  >📁 Open Folder</a
-                >
-                <a
-                  href="#"
-                  class="btn btn-secondary"
-                  @click.prevent="editNotes()"
-                  >📝 Edit Notes</a
-                >
-                <a
-                  href="#"
-                  class="btn btn-primary"
-                  @click.prevent="openCivitAI()"
-                  >🌐 View on CivitAI</a
-                >
-              </div>
-            </template>
+            <div class="top-bar">
+                <div class="model-title" id="model-title">Select a Model</div>
+                <div class="action-buttons" id="action-buttons">
+                    <button class="btn btn-primary" id="settings-btn">
+                        ⚙️ Configure Models Directory
+                    </button>
+                </div>
+            </div>
+            <div class="content-area" id="content-area">
+              <!-- ModelDetails component will render here -->
+            </div>
           </div>
         </div>
 
-        <div class="content-area" x-show="selectedModel">
+         <div class="status-bar" id="status-bar">
+        <!-- StatusBar component will render here -->
+    </div>
+    
+    <!-- Settings Modal (hidden by default) -->
+    <div id="settings-modal"></div>
+    
+    <!-- Notes Editor Modal (hidden by default) -->
+    <div id="notes-editor-modal"></div>
+    
+    <!-- Load the modular JavaScript -->
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>
+
+        <!-- <div class="content-area" x-show="selectedModel">
           <div class="info-grid">
             <div class="info-card">
               <h3>📊 Model Information</h3>
@@ -304,7 +296,7 @@
       </div>
     </div>
 
-    <!-- Settings Modal -->
+    <!- Settings Modal ->
     <div
       class="modal-overlay"
       x-show="showSettings"
@@ -406,8 +398,8 @@
       </div>
     </div>
 
-    <!-- Enhanced Notes Editor Modal -->
-    <!-- Add this to your existing templates/index.html, after the Settings Modal -->
+    <!- Enhanced Notes Editor Modal ->
+    <!- Add this to your existing templates/index.html, after the Settings Modal ->
 
     <div
       class="notes-editor-modal"
@@ -420,7 +412,7 @@
       style="display: none"
     >
       <div class="notes-editor-content" @click.stop="">
-        <!-- Header -->
+        <!- Header ->
         <div class="notes-editor-header">
           <h3 class="notes-editor-title">
             📝 Edit Notes:
@@ -436,9 +428,9 @@
           </button>
         </div>
 
-        <!-- Toolbar -->
+        <!- Toolbar ->
         <div class="notes-editor-toolbar">
-          <!-- Formatting buttons -->
+          <!- Formatting buttons ->
           <div class="toolbar-group">
             <button
               class="toolbar-btn"
@@ -465,7 +457,7 @@
 
           <div class="toolbar-separator"></div>
 
-          <!-- Structure buttons -->
+          <!- Structure buttons ->
           <div class="toolbar-group">
             <button
               class="toolbar-btn"
@@ -492,7 +484,7 @@
 
           <div class="toolbar-separator"></div>
 
-          <!-- Templates dropdown -->
+          <!- Templates dropdown ->
           <div class="toolbar-group">
             <div
               class="template-dropdown"
@@ -525,7 +517,7 @@
             </div>
           </div>
 
-          <!-- Backup restore (if backups exist) -->
+          <!- Backup restore (if backups exist) ->
           <template x-if="notesEditor.backups.length > 0">
             <div class="toolbar-group">
               <div class="toolbar-separator"></div>
@@ -557,7 +549,7 @@
           </template>
         </div>
 
-        <!-- Editor Body -->
+        <!- Editor Body ->
         <div class="notes-editor-body">
           <textarea
             id="notesTextarea"
@@ -583,10 +575,10 @@ Tips:
           ></textarea>
         </div>
 
-        <!-- Footer -->
+        <!- Footer ->
         <div class="notes-editor-footer">
           <div class="editor-status">
-            <!-- Auto-save status -->
+            <!- Auto-save status ->
             <div
               class="auto-save-indicator"
               :style="{ color: getAutoSaveStatusColor() }"
@@ -595,13 +587,13 @@ Tips:
               <span x-text="getAutoSaveStatusText()"></span>
             </div>
 
-            <!-- Word count -->
+            <!- Word count ->
             <div class="word-count">
               <span x-text="notesEditor.charCount"></span> characters,
               <span x-text="notesEditor.wordCount"></span> words
             </div>
 
-            <!-- Last saved indicator -->
+            <!- Last saved indicator ->
             <template x-if="notesEditor.lastSaved">
               <div style="color: #6272a4; font-size: 11px">
                 Last saved:
@@ -639,7 +631,7 @@ Tips:
       </div>
     </div>
 
-    <!-- Add these styles to your main.css -->
+    <!- Add these styles to your main.css ->
     <style>
       .notes-editor-modal {
         position: fixed;
@@ -912,11 +904,11 @@ Tips:
       ></div>
     </div>
 
-    <!-- Alpine.js for interactivity -->
+    <!- Alpine.js for interactivity ->
     <script
       defer
       src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
     ></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   </body>
-</html>
+</html> -->
