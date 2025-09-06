@@ -158,10 +158,18 @@ class ModelFile:
         except (OSError, ValueError):
             return None
     
+    def _generate_stable_id(self) -> str:
+        """Generate a stable string-based ID from file path"""
+        # Use a hash of the full path to create a stable, unique string ID
+        # This avoids JavaScript number precision issues
+        path_bytes = self.full_path.encode('utf-8')
+        hash_obj = hashlib.md5(path_bytes)
+        return hash_obj.hexdigest()[:16]  # 16-character hex string
+    
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
         return {
-            'id': hash(self.full_path),  # Simple ID based on path
+            'id': self._generate_stable_id(),  # Use string-based ID instead of hash(path)
             'name': self.name,
             'type': self.type,
             'size': self.size_formatted,
@@ -363,7 +371,7 @@ def test_scanner():
         
         print(f"Found {len(models)} test models:")
         for model in models:
-            print(f"  - {model.name} ({model.type})")
+            print(f"  - {model.name} ({model.type}) ID: {model._generate_stable_id()}")
         
         return models
 

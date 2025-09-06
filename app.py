@@ -36,143 +36,143 @@ class NotesService:
     TEMPLATES = {
         'checkpoint': '''# {model_name}
 
-        ## Model Information
-        - **Type:** Checkpoint Model
-        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
-        - **Resolution:** 512x512 / 768x768 / 1024x1024
-        - **File Size:** {file_size}
+## Model Information
+- **Type:** Checkpoint Model
+- **Base Model:** SD 1.5 / SD 2.1 / SDXL
+- **Resolution:** 512x512 / 768x768 / 1024x1024
+- **File Size:** {file_size}
 
-        ## Recommended Settings
-        - **Sampler:** DPM++ 2M Karras
-        - **Steps:** 20-30
-        - **CFG Scale:** 7-9
-        - **Clip Skip:** 1-2
+## Recommended Settings
+- **Sampler:** DPM++ 2M Karras
+- **Steps:** 20-30
+- **CFG Scale:** 7-9
+- **Clip Skip:** 1-2
 
-        ## Usage Notes
-        - **Best for:** [Describe what this model excels at]
-        - **Style:** [Artistic style or theme]
-        - **Trigger Words:** [Any specific trigger words]
+## Usage Notes
+- **Best for:** [Describe what this model excels at]
+- **Style:** [Artistic style or theme]
+- **Trigger Words:** [Any specific trigger words]
 
-        ## My Experience
-        - **Quality:** ⭐⭐⭐⭐⭐
-        - **Ease of Use:** ⭐⭐⭐⭐⭐
-        - **Notes:** [Your personal notes and findings]
+## My Experience
+- **Quality:** ⭐⭐⭐⭐⭐
+- **Ease of Use:** ⭐⭐⭐⭐⭐
+- **Notes:** [Your personal notes and findings]
 
-        ---
-        *Last updated: {date}*''',
+---
+*Last updated: {date}*''',
 
-                'lora': '''# {model_name}
+        'lora': '''# {model_name}
 
-        ## Model Information
-        - **Type:** LoRA (Low-Rank Adaptation)
-        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
-        - **Trigger Weight:** 0.5 - 1.0
-        - **File Size:** {file_size}
+## Model Information
+- **Type:** LoRA (Low-Rank Adaptation)
+- **Base Model:** SD 1.5 / SD 2.1 / SDXL
+- **Trigger Weight:** 0.5 - 1.0
+- **File Size:** {file_size}
 
-        ## Usage Instructions
-        - **Trigger Words:** [Required trigger words]
-        - **Recommended Weight:** 0.7-0.8
-        - **Best Prompts:** [Example prompts that work well]
+## Usage Instructions
+- **Trigger Words:** [Required trigger words]
+- **Recommended Weight:** 0.7-0.8
+- **Best Prompts:** [Example prompts that work well]
 
-        ## Settings
-        - **Works well with:** [Compatible checkpoints]
-        - **Avoid:** [Incompatible models or settings]
+## Settings
+- **Works well with:** [Compatible checkpoints]
+- **Avoid:** [Incompatible models or settings]
 
-        ## Examples
-        - [Add your successful prompt examples here]
+## Examples
+- [Add your successful prompt examples here]
 
-        ## My Notes
-        - **Quality:** ⭐⭐⭐⭐⭐
-        - **Versatility:** ⭐⭐⭐⭐⭐
-        - **Personal Notes:** [Your experience and tips]
+## My Notes
+- **Quality:** ⭐⭐⭐⭐⭐
+- **Versatility:** ⭐⭐⭐⭐⭐
+- **Personal Notes:** [Your experience and tips]
 
-        ---
-        *Last updated: {date}*''',
+---
+*Last updated: {date}*''',
 
-                'vae': '''# {model_name}
+        'vae': '''# {model_name}
 
-        ## Model Information
-        - **Type:** VAE (Variational Autoencoder)
-        - **Compatible with:** SD 1.5 / SD 2.1 / SDXL
-        - **File Size:** {file_size}
+## Model Information
+- **Type:** VAE (Variational Autoencoder)
+- **Compatible with:** SD 1.5 / SD 2.1 / SDXL
+- **File Size:** {file_size}
 
-        ## Purpose & Usage
-        - **Improves:** [Color accuracy, detail, contrast, etc.]
-        - **Best for:** [Types of images this VAE works best with]
-        - **Comparison:** [How it compares to other VAEs]
+## Purpose & Usage
+- **Improves:** [Color accuracy, detail, contrast, etc.]
+- **Best for:** [Types of images this VAE works best with]
+- **Comparison:** [How it compares to other VAEs]
 
-        ## Technical Notes
-        - **Resolution:** [Optimal resolution settings]
-        - **Performance:** [Impact on generation speed]
-        - **Memory Usage:** [VRAM requirements]
+## Technical Notes
+- **Resolution:** [Optimal resolution settings]
+- **Performance:** [Impact on generation speed]
+- **Memory Usage:** [VRAM requirements]
 
-        ## My Experience
-        - **Visual Quality:** ⭐⭐⭐⭐⭐
-        - **Performance Impact:** ⭐⭐⭐⭐⭐
-        - **Notes:** [Your observations and comparisons]
+## My Experience
+- **Visual Quality:** ⭐⭐⭐⭐⭐
+- **Performance Impact:** ⭐⭐⭐⭐⭐
+- **Notes:** [Your observations and comparisons]
 
-        ---
-        *Last updated: {date}*''',
+---
+*Last updated: {date}*''',
 
-                'controlnet': '''# {model_name}
+        'controlnet': '''# {model_name}
 
-        ## Model Information
-        - **Type:** ControlNet
-        - **Control Type:** [Canny, Depth, OpenPose, etc.]
-        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
-        - **File Size:** {file_size}
+## Model Information
+- **Type:** ControlNet
+- **Control Type:** [Canny, Depth, OpenPose, etc.]
+- **Base Model:** SD 1.5 / SD 2.1 / SDXL
+- **File Size:** {file_size}
 
-        ## Usage Settings
-        - **Control Weight:** 0.8-1.2
-        - **Starting Step:** 0
-        - **Ending Step:** 1.0
-        - **Preprocessor:** [Required preprocessor]
+## Usage Settings
+- **Control Weight:** 0.8-1.2
+- **Starting Step:** 0
+- **Ending Step:** 1.0
+- **Preprocessor:** [Required preprocessor]
 
-        ## Best Use Cases
-        - [Describe what this ControlNet is best for]
-        - [Mention any specific scenarios]
+## Best Use Cases
+- [Describe what this ControlNet is best for]
+- [Mention any specific scenarios]
 
-        ## Tips & Tricks
-        - [Your personal tips for using this ControlNet]
-        - [Common issues and solutions]
+## Tips & Tricks
+- [Your personal tips for using this ControlNet]
+- [Common issues and solutions]
 
-        ## My Experience
-        - **Accuracy:** ⭐⭐⭐⭐⭐
-        - **Ease of Use:** ⭐⭐⭐⭐⭐
-        - **Notes:** [Your findings and recommendations]
+## My Experience
+- **Accuracy:** ⭐⭐⭐⭐⭐
+- **Ease of Use:** ⭐⭐⭐⭐⭐
+- **Notes:** [Your findings and recommendations]
 
-        ---
-        *Last updated: {date}*''',
+---
+*Last updated: {date}*''',
 
-                'embedding': '''# {model_name}
+        'embedding': '''# {model_name}
 
-        ## Model Information
-        - **Type:** Textual Inversion / Embedding
-        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
-        - **Vectors:** [Number of vectors]
-        - **File Size:** {file_size}
+## Model Information
+- **Type:** Textual Inversion / Embedding
+- **Base Model:** SD 1.5 / SD 2.1 / SDXL
+- **Vectors:** [Number of vectors]
+- **File Size:** {file_size}
 
-        ## Usage Instructions
-        - **Trigger Word:** {model_name}
-        - **Placement:** [Beginning, end, or middle of prompt]
-        - **Weight:** Usually 1.0 (can be adjusted)
+## Usage Instructions
+- **Trigger Word:** {model_name}
+- **Placement:** [Beginning, end, or middle of prompt]
+- **Weight:** Usually 1.0 (can be adjusted)
 
-        ## Purpose
-        - **Effect:** [What this embedding does]
-        - **Style:** [Artistic style or effect it provides]
+## Purpose
+- **Effect:** [What this embedding does]
+- **Style:** [Artistic style or effect it provides]
 
-        ## Example Prompts
-        ```
-        [Add your successful prompt examples here]
-        ```
+## Example Prompts
+```
+[Add your successful prompt examples here]
+```
 
-        ## My Notes
-        - **Effectiveness:** ⭐⭐⭐⭐⭐
-        - **Versatility:** ⭐⭐⭐⭐⭐
-        - **Personal Tips:** [Your experience and usage tips]
+## My Notes
+- **Effectiveness:** ⭐⭐⭐⭐⭐
+- **Versatility:** ⭐⭐⭐⭐⭐
+- **Personal Tips:** [Your experience and usage tips]
 
-        ---
-        *Last updated: {date}*'''
+---
+*Last updated: {date}*'''
     }
     
     def __init__(self):
@@ -366,7 +366,7 @@ class NotesService:
                 'message': f'Failed to restore backup: {str(e)}'
             }
 
-# Initialize notes service
+# Initialize notes service AFTER the class is defined
 notes_service = NotesService()
 
 def load_settings():
@@ -446,12 +446,18 @@ def api_models():
         'timestamp': datetime.now().isoformat()
     })
 
-@app.route('/api/models/<int:model_id>')
+@app.route('/api/models/<model_id>')
 def api_model_detail(model_id):
     """API endpoint to get detailed information about a specific model"""
-    model = next((m for m in current_models if m['id'] == model_id), None)
+    model = None
+    for m in current_models:
+        if str(m['id']) == str(model_id):
+            model = m
+            break
     
     if not model:
+        print(f"❌ Model {model_id} not found")
+        print(f"📊 Available model IDs: {[m['id'] for m in current_models[:5]]}")
         return jsonify({'error': 'Model not found'}), 404
     
     return jsonify(model)
@@ -584,17 +590,15 @@ def api_stats():
     
     return jsonify(stats)
 
-# REPLACE the existing notes API endpoints in app.py with these:
-
-@app.route('/api/notes/<int:model_id>', methods=['GET', 'POST'])
+@app.route('/api/notes/<model_id>', methods=['GET', 'POST'])
 def api_model_notes_simple(model_id):
-    """Simple working notes API endpoint"""
+    """Simple working notes API endpoint with string ID support"""
     print(f"📝 Notes API called for model ID: {model_id}")
     
-    # Find the model
+    # Find the model using string comparison
     model = None
     for m in current_models:
-        if m['id'] == model_id:
+        if str(m['id']) == str(model_id):
             model = m
             break
     
@@ -692,14 +696,14 @@ def api_model_notes_simple(model_id):
                 'message': str(e)
             }), 500
 
-@app.route('/api/notes/<int:model_id>/template/<template_type>')
+@app.route('/api/notes/<model_id>/template/<template_type>')
 def api_get_note_template_simple(model_id, template_type):
     """Get a formatted template for a specific model"""
     print(f"📋 Template requested: {template_type} for model {model_id}")
     
     model = None
     for m in current_models:
-        if m['id'] == model_id:
+        if str(m['id']) == str(model_id):
             model = m
             break
     
@@ -726,31 +730,15 @@ def api_get_note_template_simple(model_id, template_type):
             'status': 'error',
             'message': str(e)
         }), 500
-@app.route('/api/notes/<int:model_id>/template/<template_type>')
-def api_get_note_template(model_id, template_type):
-    """Get a formatted template for a specific model"""
-    model = next((m for m in current_models if m['id'] == model_id), None)
-    
-    if not model:
-        return jsonify({'error': 'Model not found'}), 404
-    
-    template_content = notes_service.get_template(
-        template_type, 
-        model['name'], 
-        model['size']
-    )
-    
-    return jsonify({
-        'status': 'success',
-        'template_type': template_type,
-        'content': template_content,
-        'model_name': model['name']
-    })
 
-@app.route('/api/notes/<int:model_id>/backups')
+@app.route('/api/notes/<model_id>/backups')
 def api_get_note_backups(model_id):
     """Get available backups for a model's notes"""
-    model = next((m for m in current_models if m['id'] == model_id), None)
+    model = None
+    for m in current_models:
+        if str(m['id']) == str(model_id):
+            model = m
+            break
     
     if not model:
         return jsonify({'error': 'Model not found'}), 404
@@ -763,10 +751,14 @@ def api_get_note_backups(model_id):
         'model_name': model['name']
     })
 
-@app.route('/api/notes/<int:model_id>/restore', methods=['POST'])
+@app.route('/api/notes/<model_id>/restore', methods=['POST'])
 def api_restore_note_backup(model_id):
     """Restore a backup for a model's notes"""
-    model = next((m for m in current_models if m['id'] == model_id), None)
+    model = None
+    for m in current_models:
+        if str(m['id']) == str(model_id):
+            model = m
+            break
     
     if not model:
         return jsonify({'error': 'Model not found'}), 404
