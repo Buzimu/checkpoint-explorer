@@ -406,6 +406,500 @@
       </div>
     </div>
 
+    <!-- Enhanced Notes Editor Modal -->
+    <!-- Add this to your existing templates/index.html, after the Settings Modal -->
+
+    <div
+      class="notes-editor-modal"
+      x-show="notesEditor.isOpen"
+      x-transition:enter="fade-enter-active"
+      x-transition:enter-start="fade-enter-from"
+      x-transition:leave="fade-leave-active"
+      x-transition:leave-to="fade-leave-to"
+      @click.self="closeNotesEditor()"
+      style="display: none"
+    >
+      <div class="notes-editor-content" @click.stop="">
+        <!-- Header -->
+        <div class="notes-editor-header">
+          <h3 class="notes-editor-title">
+            📝 Edit Notes:
+            <span x-text="selectedModel?.name || 'Unknown Model'"></span>
+          </h3>
+          <button
+            type="button"
+            class="modal-close"
+            @click="closeNotesEditor()"
+            title="Close (Esc)"
+          >
+            ×
+          </button>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="notes-editor-toolbar">
+          <!-- Formatting buttons -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn"
+              title="Bold (Ctrl+B)"
+              @click="insertFormatting('**', '**')"
+            >
+              <strong>B</strong>
+            </button>
+            <button
+              class="toolbar-btn"
+              title="Italic (Ctrl+I)"
+              @click="insertFormatting('*', '*')"
+            >
+              <em>I</em>
+            </button>
+            <button
+              class="toolbar-btn"
+              title="Code (Ctrl+`)"
+              @click="insertFormatting('`', '`')"
+            >
+              &lt;/&gt;
+            </button>
+          </div>
+
+          <div class="toolbar-separator"></div>
+
+          <!-- Structure buttons -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn"
+              title="Add Heading"
+              @click="insertFormatting('## ', '')"
+            >
+              H
+            </button>
+            <button
+              class="toolbar-btn"
+              title="Add List Item"
+              @click="insertFormatting('- ', '')"
+            >
+              ≡
+            </button>
+            <button
+              class="toolbar-btn"
+              title="Add Separator"
+              @click="insertText('\n---\n')"
+            >
+              ─
+            </button>
+          </div>
+
+          <div class="toolbar-separator"></div>
+
+          <!-- Templates dropdown -->
+          <div class="toolbar-group">
+            <div
+              class="template-dropdown"
+              :class="{ 'open': notesEditor.showTemplateDropdown }"
+            >
+              <button
+                class="template-btn toolbar-btn"
+                @click="toggleTemplateDropdown()"
+                title="Apply template"
+              >
+                📋 Templates ▼
+              </button>
+              <div class="template-dropdown-content">
+                <template
+                  x-for="template in notesEditor.templates"
+                  :key="template.id"
+                >
+                  <div
+                    class="template-item"
+                    @click="applyTemplate(template.id)"
+                  >
+                    <div class="template-name" x-text="template.name"></div>
+                    <div
+                      class="template-description"
+                      x-text="template.description"
+                    ></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Backup restore (if backups exist) -->
+          <template x-if="notesEditor.backups.length > 0">
+            <div class="toolbar-group">
+              <div class="toolbar-separator"></div>
+              <select
+                class="toolbar-btn"
+                style="
+                  padding: 4px 8px;
+                  background: rgba(68, 71, 90, 0.5);
+                  border: 1px solid #6272a4;
+                  border-radius: 4px;
+                  color: #f8f8f2;
+                  font-size: 12px;
+                "
+                @change="$event.target.value && restoreBackup($event.target.value); $event.target.value = ''"
+                title="Restore from backup"
+              >
+                <option value="">📚 Restore Backup</option>
+                <template
+                  x-for="backup in notesEditor.backups"
+                  :key="backup.filename"
+                >
+                  <option
+                    :value="backup.filename"
+                    x-text="`${backup.filename} (${new Date(backup.created).toLocaleDateString()})`"
+                  ></option>
+                </template>
+              </select>
+            </div>
+          </template>
+        </div>
+
+        <!-- Editor Body -->
+        <div class="notes-editor-body">
+          <textarea
+            id="notesTextarea"
+            class="notes-textarea"
+            x-model="notesEditor.content"
+            @input="onNotesInput()"
+            @keydown="handleNotesKeydown($event)"
+            placeholder="Enter your notes here...
+
+Use the toolbar above for formatting, or type manually:
+• **bold text** for emphasis
+• *italic text* for subtle emphasis  
+• `code` for settings or technical terms
+• ## Headings for organization
+• - List items for organization
+
+Tips:
+• Save automatically happens every 5 seconds
+• Use Ctrl+S to save manually
+• Use Ctrl+Z to undo changes
+• Use templates for quick formatting"
+            spellcheck="true"
+          ></textarea>
+        </div>
+
+        <!-- Footer -->
+        <div class="notes-editor-footer">
+          <div class="editor-status">
+            <!-- Auto-save status -->
+            <div
+              class="auto-save-indicator"
+              :style="{ color: getAutoSaveStatusColor() }"
+            >
+              <span>●</span>
+              <span x-text="getAutoSaveStatusText()"></span>
+            </div>
+
+            <!-- Word count -->
+            <div class="word-count">
+              <span x-text="notesEditor.charCount"></span> characters,
+              <span x-text="notesEditor.wordCount"></span> words
+            </div>
+
+            <!-- Last saved indicator -->
+            <template x-if="notesEditor.lastSaved">
+              <div style="color: #6272a4; font-size: 11px">
+                Last saved:
+                <span
+                  x-text="notesEditor.lastSaved.toLocaleTimeString()"
+                ></span>
+              </div>
+            </template>
+          </div>
+
+          <div class="editor-actions">
+            <button
+              class="btn btn-secondary"
+              @click="closeNotesEditor()"
+              title="Cancel changes (Esc)"
+            >
+              Cancel
+            </button>
+
+            <button
+              class="btn btn-primary"
+              @click="saveAndCloseNotes()"
+              :disabled="!notesEditor.isDirty"
+              title="Save and close (Ctrl+S)"
+            >
+              <template x-if="notesEditor.autoSaveStatus === 'saving'">
+                <span>💾 Saving...</span>
+              </template>
+              <template x-if="notesEditor.autoSaveStatus !== 'saving'">
+                <span>💾 Save & Close</span>
+              </template>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add these styles to your main.css -->
+    <style>
+      .notes-editor-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        backdrop-filter: blur(4px);
+      }
+
+      .notes-editor-content {
+        background: rgba(40, 42, 54, 0.98);
+        border: 1px solid #44475a;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 900px;
+        max-height: 85vh;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .notes-editor-header {
+        padding: 20px;
+        border-bottom: 1px solid #44475a;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(68, 71, 90, 0.3);
+      }
+
+      .notes-editor-title {
+        color: #bd93f9;
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .notes-editor-toolbar {
+        padding: 15px 20px;
+        border-bottom: 1px solid #44475a;
+        background: rgba(68, 71, 90, 0.2);
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .toolbar-group {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+
+      .toolbar-btn {
+        padding: 6px 10px;
+        background: rgba(68, 71, 90, 0.5);
+        border: 1px solid #6272a4;
+        border-radius: 4px;
+        color: #f8f8f2;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 32px;
+        justify-content: center;
+      }
+
+      .toolbar-btn:hover {
+        background: rgba(189, 147, 249, 0.2);
+        border-color: #bd93f9;
+      }
+
+      .toolbar-btn.active {
+        background: #bd93f9;
+        color: #282a36;
+        border-color: #bd93f9;
+      }
+
+      .toolbar-separator {
+        width: 1px;
+        height: 20px;
+        background: #44475a;
+        margin: 0 4px;
+      }
+
+      .notes-editor-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .notes-textarea {
+        flex: 1;
+        padding: 20px;
+        background: rgba(40, 42, 54, 0.5);
+        border: none;
+        color: #f8f8f2;
+        font-family: "Courier New", "Consolas", monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        resize: none;
+        outline: none;
+        min-height: 300px;
+      }
+
+      .notes-textarea::placeholder {
+        color: #6272a4;
+        font-style: italic;
+      }
+
+      .notes-editor-footer {
+        padding: 15px 20px;
+        border-top: 1px solid #44475a;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(68, 71, 90, 0.2);
+      }
+
+      .editor-status {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #6272a4;
+        font-size: 12px;
+      }
+
+      .auto-save-indicator {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 500;
+      }
+
+      .word-count {
+        font-family: monospace;
+      }
+
+      .editor-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .template-dropdown {
+        position: relative;
+        display: inline-block;
+      }
+
+      .template-btn {
+        padding: 6px 12px;
+        background: rgba(68, 71, 90, 0.5);
+        border: 1px solid #6272a4;
+        border-radius: 4px;
+        color: #f8f8f2;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .template-dropdown-content {
+        position: absolute;
+        bottom: 100%;
+        left: 0;
+        background: rgba(40, 42, 54, 0.98);
+        border: 1px solid #44475a;
+        border-radius: 6px;
+        min-width: 220px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: none;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .template-dropdown.open .template-dropdown-content {
+        display: block;
+      }
+
+      .template-item {
+        padding: 12px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(68, 71, 90, 0.5);
+        transition: background 0.2s ease;
+      }
+
+      .template-item:last-child {
+        border-bottom: none;
+      }
+
+      .template-item:hover {
+        background: rgba(189, 147, 249, 0.1);
+      }
+
+      .template-name {
+        font-weight: 500;
+        color: #f8f8f2;
+        margin-bottom: 2px;
+        font-size: 13px;
+      }
+
+      .template-description {
+        font-size: 11px;
+        color: #6272a4;
+        line-height: 1.3;
+      }
+
+      /* Responsive design */
+      @media (max-width: 768px) {
+        .notes-editor-content {
+          width: 95%;
+          max-height: 90vh;
+        }
+
+        .toolbar-group {
+          flex-wrap: wrap;
+        }
+
+        .editor-actions {
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .editor-status {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 6px;
+        }
+      }
+
+      /* Enhanced scrollbar for notes editor */
+      .notes-textarea::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .notes-textarea::-webkit-scrollbar-track {
+        background: rgba(40, 42, 54, 0.5);
+      }
+
+      .notes-textarea::-webkit-scrollbar-thumb {
+        background: #6272a4;
+        border-radius: 4px;
+      }
+
+      .notes-textarea::-webkit-scrollbar-thumb:hover {
+        background: #bd93f9;
+      }
+    </style>
+
     <div class="status-bar">
       <div class="status-indicator">
         <div class="status-dot" :class="{ 'connected': isConnected }"></div>

@@ -1,7 +1,7 @@
-// Main Alpine.js data and functionality
+// Main Alpine.js data and functionality - FIXED VERSION
 function modelExplorer() {
   return {
-    // Data
+    // Data - make sure ALL properties are defined
     models: [],
     filteredModels: [],
     selectedModel: null,
@@ -35,25 +35,31 @@ function modelExplorer() {
         window.Alpine ? "loaded" : "not loaded"
       );
 
-      await this.loadSettings();
-      await this.loadModels();
-      this.checkComfyUIConnection();
-
-      // Set up periodic connection check
-      setInterval(() => {
+      try {
+        await this.loadSettings();
+        await this.loadModels();
         this.checkComfyUIConnection();
-      }, 30000); // Check every 30 seconds
 
-      console.log("✅ Initialization complete");
+        // Set up periodic connection check
+        setInterval(() => {
+          this.checkComfyUIConnection();
+        }, 30000);
+
+        console.log("✅ Initialization complete");
+      } catch (error) {
+        console.error("❌ Initialization failed:", error);
+      }
     },
 
     // Load settings from server
     async loadSettings() {
       try {
         const response = await fetch("/api/settings");
-        const settings = await response.json();
-        this.settingsForm = { ...settings };
-        console.log("📄 Loaded settings:", settings);
+        if (response.ok) {
+          const settings = await response.json();
+          this.settingsForm = { ...this.settingsForm, ...settings };
+          console.log("📄 Loaded settings:", settings);
+        }
       } catch (error) {
         console.error("❌ Failed to load settings:", error);
       }
@@ -63,6 +69,8 @@ function modelExplorer() {
     async loadModels() {
       try {
         this.loading = true;
+        console.log("📡 Loading models from API...");
+
         const response = await fetch("/api/models");
 
         if (!response.ok) {
@@ -71,6 +79,7 @@ function modelExplorer() {
 
         const data = await response.json();
 
+        // Ensure we have valid data
         this.models = Array.isArray(data.models) ? data.models : [];
         this.filteredModels = [...this.models];
 
@@ -80,6 +89,9 @@ function modelExplorer() {
         if (this.models.length > 0 && !this.selectedModel) {
           this.selectModel(this.models[0]);
         }
+
+        // Filter models to update display
+        this.filterModels();
       } catch (error) {
         console.error("❌ Failed to load models:", error);
         this.showNotification(
@@ -155,10 +167,7 @@ function modelExplorer() {
       }
     },
 
-    // Replace the settings-related functions in your main.js with these fixed versions
-
     // Settings functions
-
     openSettings() {
       this.showSettings = true;
       console.log(
@@ -174,8 +183,6 @@ function modelExplorer() {
         }
       }, 100);
     },
-
-    // Replace the closeSettings function in your main.js with this version that includes direct DOM manipulation
 
     closeSettings() {
       console.log("⚙️ Closing settings");
@@ -305,7 +312,6 @@ function modelExplorer() {
     browseDirectory() {
       console.log("📂 Browse Directory clicked!");
 
-      // Since web apps can't open native file browsers, provide helpful guidance
       const isWindows = navigator.platform.includes("Win");
       const examples = isWindows
         ? [
@@ -333,13 +339,11 @@ function modelExplorer() {
             "- controlnet/",
           ];
 
-      // Show helpful dialog
       alert(
         "Web apps cannot open file browsers.\n\nPlease manually enter your ComfyUI models directory path.\n\n" +
           examples.join("\n")
       );
 
-      // Focus and select the input field
       setTimeout(() => {
         const input = document.querySelector(".setting-input");
         if (input) {
@@ -349,61 +353,11 @@ function modelExplorer() {
       }, 100);
     },
 
-    // Enhanced keyboard shortcuts that work in modal
-    handleKeydown(event) {
-      // Escape key - close modal or clear search
-      if (event.key === "Escape") {
-        if (this.showSettings) {
-          this.closeSettings();
-          return;
-        } else if (this.searchQuery) {
-          this.searchQuery = "";
-          this.filterModels();
-        } else {
-          this.selectedModel = null;
-        }
-      }
-
-      // Don't handle other shortcuts if modal is open
-      if (this.showSettings) {
-        // Enter key in modal - save settings
-        if (
-          event.key === "Enter" &&
-          event.target.classList.contains("setting-input")
-        ) {
-          event.preventDefault();
-          this.saveSettings();
-        }
-        return;
-      }
-
-      // F2 - Edit notes
-      if (event.key === "F2" && this.selectedModel) {
-        this.editNotes();
-      }
-
-      // Ctrl+F - Focus search
-      if (event.ctrlKey && event.key === "f") {
-        event.preventDefault();
-        const searchBox = document.querySelector(".search-box");
-        if (searchBox) {
-          searchBox.focus();
-        }
-      }
-
-      // Arrow keys for model navigation
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault();
-        this.navigateModels(event.key === "ArrowDown" ? 1 : -1);
-      }
-    },
-
     // Action handlers
     openFolder() {
       if (this.selectedModel) {
         console.log(`📁 Opening folder for: ${this.selectedModel.name}`);
         this.showNotification("Opening model folder...", "info");
-        // TODO: Implement actual folder opening
       }
     },
 
@@ -411,14 +365,12 @@ function modelExplorer() {
       if (this.selectedModel) {
         console.log(`📝 Editing notes for: ${this.selectedModel.name}`);
         this.showNotification("Notes editor coming soon...", "info");
-        // TODO: Implement notes editor
       }
     },
 
     openCivitAI() {
       if (this.selectedModel) {
         console.log(`🌐 Opening CivitAI for: ${this.selectedModel.name}`);
-        // For now, just open CivitAI homepage
         window.open("https://civitai.com", "_blank");
         this.showNotification("Opening CivitAI...", "success");
       }
@@ -439,7 +391,6 @@ function modelExplorer() {
 
     // Gallery functions
     getExampleImage(type) {
-      // Generate placeholder images based on type
       const imageMap = {
         portrait: this.generatePlaceholderSVG("Portrait", "512x768", 150, 200),
         full_body: this.generatePlaceholderSVG(
@@ -463,44 +414,39 @@ function modelExplorer() {
 
     generatePlaceholderSVG(title, resolution, width, height) {
       const svg = `
-                <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="${width}" height="${height}" fill="#44475a"/>
-                    <text x="50%" y="40%" fill="#f8f8f2" text-anchor="middle" dy=".3em" 
-                          font-family="sans-serif" font-size="12px">${title}</text>
-                    <text x="50%" y="60%" fill="#6272a4" text-anchor="middle" dy=".3em" 
-                          font-family="sans-serif" font-size="10px">${resolution}</text>
-                </svg>
-            `;
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          <rect width="${width}" height="${height}" fill="#44475a"/>
+          <text x="50%" y="40%" fill="#f8f8f2" text-anchor="middle" dy=".3em" 
+                font-family="sans-serif" font-size="12px">${title}</text>
+          <text x="50%" y="60%" fill="#6272a4" text-anchor="middle" dy=".3em" 
+                font-family="sans-serif" font-size="10px">${resolution}</text>
+        </svg>
+      `;
       return "data:image/svg+xml;base64," + btoa(svg);
     },
 
     viewExample(example) {
       console.log(`🖼️ Viewing example: ${example.type}`);
       this.showNotification(`Viewing ${example.type} example`, "info");
-      // TODO: Implement full-screen image viewer
     },
 
     addExample() {
       if (this.selectedModel) {
         console.log(`➕ Adding example for: ${this.selectedModel.name}`);
         this.showNotification("Image upload coming soon...", "info");
-        // TODO: Implement image upload
       }
     },
 
     // ComfyUI connection check
     async checkComfyUIConnection() {
       try {
-        // Try to connect to ComfyUI's default port
         const response = await fetch("http://localhost:8188/system_stats", {
           method: "GET",
           mode: "cors",
         });
         this.isConnected = response.ok;
       } catch (error) {
-        // Handle CORS and network errors gracefully
         this.isConnected = false;
-        // Only log if it's not a common CORS error
         if (
           !error.message.includes("CORS") &&
           !error.message.includes("NetworkError")
@@ -510,81 +456,8 @@ function modelExplorer() {
       }
     },
 
-    // Utility functions
-    showNotification(message, type = "info") {
-      // Create a simple toast notification
-      const toast = document.createElement("div");
-      toast.className = `toast toast-${type}`;
-      toast.textContent = message;
-
-      // Style the toast
-      Object.assign(toast.style, {
-        position: "fixed",
-        top: "20px",
-        right: "20px",
-        padding: "12px 20px",
-        borderRadius: "6px",
-        color: "#f8f8f2",
-        fontWeight: "500",
-        zIndex: "1000",
-        opacity: "0",
-        transform: "translateX(100%)",
-        transition: "all 0.3s ease",
-      });
-
-      // Set background color based on type
-      const colors = {
-        success: "#50fa7b",
-        error: "#ff5555",
-        warning: "#ffb86c",
-        info: "#8be9fd",
-      };
-      toast.style.backgroundColor = colors[type] || colors.info;
-
-      document.body.appendChild(toast);
-
-      // Animate in
-      setTimeout(() => {
-        toast.style.opacity = "1";
-        toast.style.transform = "translateX(0)";
-      }, 100);
-
-      // Remove after 3 seconds
-      setTimeout(() => {
-        toast.style.opacity = "0";
-        toast.style.transform = "translateX(100%)";
-        setTimeout(() => {
-          document.body.removeChild(toast);
-        }, 300);
-      }, 3000);
-    },
-
-    formatFileSize(bytes) {
-      if (!bytes) return "Unknown";
-
-      const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-      if (bytes === 0) return "0 Bytes";
-
-      const i = Math.floor(Math.log(bytes) / Math.log(1024));
-      return (
-        parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + " " + sizes[i]
-      );
-    },
-
-    formatDate(dateString) {
-      if (!dateString) return "Unknown";
-
-      try {
-        const date = new Date(dateString);
-        return date.toLocaleDateString();
-      } catch (error) {
-        return dateString;
-      }
-    },
-
     // Keyboard shortcuts
     handleKeydown(event) {
-      // Escape key - clear selection or search or close modal
       if (event.key === "Escape") {
         if (this.showSettings) {
           this.closeSettings();
@@ -596,15 +469,21 @@ function modelExplorer() {
         }
       }
 
-      // Don't handle other shortcuts if modal is open
-      if (this.showSettings) return;
+      if (this.showSettings) {
+        if (
+          event.key === "Enter" &&
+          event.target.classList.contains("setting-input")
+        ) {
+          event.preventDefault();
+          this.saveSettings();
+        }
+        return;
+      }
 
-      // F2 - Edit notes
       if (event.key === "F2" && this.selectedModel) {
         this.editNotes();
       }
 
-      // Ctrl+F - Focus search
       if (event.ctrlKey && event.key === "f") {
         event.preventDefault();
         const searchBox = document.querySelector(".search-box");
@@ -613,7 +492,6 @@ function modelExplorer() {
         }
       }
 
-      // Arrow keys for model navigation
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         this.navigateModels(event.key === "ArrowDown" ? 1 : -1);
@@ -642,110 +520,52 @@ function modelExplorer() {
       }
     },
 
-    // Add these methods to your modelExplorer() function
+    // Utility functions
+    showNotification(message, type = "info") {
+      const toast = document.createElement("div");
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
 
-    // Directory validation before scanning
-    async validateDirectory() {
-      if (!this.settingsForm.models_directory.trim()) {
-        return false;
-      }
+      Object.assign(toast.style, {
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        padding: "12px 20px",
+        borderRadius: "6px",
+        color: "#f8f8f2",
+        fontWeight: "500",
+        zIndex: "1000",
+        opacity: "0",
+        transform: "translateX(100%)",
+        transition: "all 0.3s ease",
+      });
 
-      try {
-        const response = await fetch("/api/validate_directory", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            directory: this.settingsForm.models_directory,
-          }),
-        });
+      const colors = {
+        success: "#50fa7b",
+        error: "#ff5555",
+        warning: "#ffb86c",
+        info: "#8be9fd",
+      };
+      toast.style.backgroundColor = colors[type] || colors.info;
 
-        const result = await response.json();
+      document.body.appendChild(toast);
 
-        if (!result.valid) {
-          this.showNotification(result.message, "error");
-          return false;
-        }
+      setTimeout(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateX(0)";
+      }, 100);
 
-        if (result.warning) {
-          this.showNotification(result.message, "warning");
-        } else {
-          this.showNotification(result.message, "success");
-        }
-
-        return true;
-      } catch (error) {
-        this.showNotification("Failed to validate directory", "error");
-        return false;
-      }
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(100%)";
+        setTimeout(() => {
+          if (document.body.contains(toast)) {
+            document.body.removeChild(toast);
+          }
+        }, 300);
+      }, 3000);
     },
 
-    // Enhanced save settings with validation
-    async saveSettings() {
-      try {
-        console.log("💾 Saving settings:", this.settingsForm);
-
-        // Validate directory first
-        const isValid = await this.validateDirectory();
-        if (!isValid) {
-          return;
-        }
-
-        this.scanProgress.active = true;
-        this.scanProgress.message = "Saving settings...";
-        this.scanProgress.percent = 10;
-
-        const response = await fetch("/api/settings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(this.settingsForm),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Server error: ${response.status} - ${errorText}`);
-        }
-
-        const result = await response.json();
-        console.log("✅ Settings saved:", result);
-
-        this.showNotification("Settings saved successfully!", "success");
-
-        // Trigger scan
-        await this.scanModels();
-      } catch (error) {
-        console.error("❌ Failed to save settings:", error);
-        this.showNotification(
-          `Failed to save settings: ${error.message}`,
-          "error"
-        );
-        this.scanProgress.active = false;
-      }
-    },
-
-    // Quick refresh models button
-    async refreshModels() {
-      try {
-        this.loading = true;
-        const response = await fetch("/api/models/refresh");
-        const result = await response.json();
-
-        if (result.status === "success") {
-          await this.loadModels();
-          this.showNotification(
-            `Refreshed! Found ${result.models_found} models.`,
-            "success"
-          );
-        } else {
-          this.showNotification(result.message, "error");
-        }
-      } catch (error) {
-        this.showNotification("Failed to refresh models", "error");
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    // Better file size formatting
     formatFileSize(bytes) {
       if (!bytes) return "Unknown";
 
@@ -756,6 +576,17 @@ function modelExplorer() {
       const size = (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1);
       return `${size} ${sizes[i]}`;
     },
+
+    formatDate(dateString) {
+      if (!dateString) return "Unknown";
+
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+      } catch (error) {
+        return dateString;
+      }
+    },
   };
 }
 
@@ -765,17 +596,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Set up global keyboard shortcuts
   document.addEventListener("keydown", (event) => {
-    // Get the Alpine.js component instance
     const explorerComponent = document.querySelector(
       '[x-data="modelExplorer()"]'
     );
     if (explorerComponent && explorerComponent._x_dataStack) {
       const data = explorerComponent._x_dataStack[0];
-      data.handleKeydown(event);
+      if (data && data.handleKeydown) {
+        data.handleKeydown(event);
+      }
     }
   });
 
-  // Add some helpful console messages
   console.log("💡 Tips:");
   console.log("  - Use Ctrl+F to focus search");
   console.log("  - Use F2 to edit notes");
@@ -786,128 +617,71 @@ document.addEventListener("DOMContentLoaded", () => {
 // Export for global access if needed
 window.modelExplorer = modelExplorer;
 
-// Manual event binding for modal buttons (workaround for Alpine.js issue)
-document.addEventListener("DOMContentLoaded", function () {
-  console.log("🔧 Setting up manual event listeners...");
+// Simple button fix that will work immediately
+setTimeout(() => {
+  console.log("🔧 Setting up button fixes...");
 
-  // Function to get the Alpine component data
-  function getAppData() {
-    const appContainer = document.querySelector('[x-data="modelExplorer()"]');
-    return appContainer && appContainer._x_dataStack
-      ? appContainer._x_dataStack[0]
+  // Get the Alpine.js app instance
+  function getApp() {
+    const container = document.querySelector('[x-data="modelExplorer()"]');
+    return container && container._x_dataStack
+      ? container._x_dataStack[0]
       : null;
   }
 
-  // Set up event listeners with a delay to ensure modal exists
-  function setupModalEvents() {
-    const app = getAppData();
-    if (!app) {
-      console.log("App not ready, retrying in 500ms...");
-      setTimeout(setupModalEvents, 500);
-      return;
-    }
-
-    // Close button (X)
-    const closeButton = document.querySelector(".modal-close");
-    if (closeButton) {
-      closeButton.addEventListener("click", function (e) {
-        e.preventDefault();
-        console.log("Manual close button clicked!");
+  // Fix close button
+  const closeBtn = document.querySelector(".modal-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      const app = getApp();
+      if (app && app.closeSettings) {
         app.closeSettings();
-      });
-      console.log("✅ Close button event listener added");
-    }
+      } else {
+        document.querySelector(".modal-overlay").style.display = "none";
+      }
+    });
+  }
 
-    // Cancel button
-    const cancelButton = document.querySelector(".modal-footer .btn-secondary");
-    if (cancelButton) {
-      cancelButton.addEventListener("click", function (e) {
-        e.preventDefault();
-        console.log("Manual cancel button clicked!");
+  // Fix cancel button
+  const cancelBtn = document.querySelector(".modal-footer .btn-secondary");
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      const app = getApp();
+      if (app && app.closeSettings) {
         app.closeSettings();
-      });
-      console.log("✅ Cancel button event listener added");
-    }
+      } else {
+        document.querySelector(".modal-overlay").style.display = "none";
+      }
+    });
+  }
 
-    // Save & Scan button
-    const saveButton = document.querySelector(".modal-footer .btn-primary");
-    if (saveButton) {
-      saveButton.addEventListener("click", function (e) {
-        e.preventDefault();
-        console.log("Manual save button clicked!");
+  // Fix save button
+  const saveBtn = document.querySelector(".modal-footer .btn-primary");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      const app = getApp();
+      if (app && app.saveSettings) {
         app.saveSettings();
-      });
-      console.log("✅ Save button event listener added");
-    }
+      }
+    });
+  }
 
-    // Browse button
-    const browseButton = document.querySelector(
-      ".directory-input-group .btn-secondary"
-    );
-    if (browseButton) {
-      browseButton.addEventListener("click", function (e) {
-        e.preventDefault();
-        console.log("Manual browse button clicked!");
+  // Fix browse button
+  const browseBtn = document.querySelector(
+    ".directory-input-group .btn-secondary"
+  );
+  if (browseBtn) {
+    browseBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      const app = getApp();
+      if (app && app.browseDirectory) {
         app.browseDirectory();
-      });
-      console.log("✅ Browse button event listener added");
-    }
-
-    // Modal overlay click to close
-    const modalOverlay = document.querySelector(".modal-overlay");
-    if (modalOverlay) {
-      modalOverlay.addEventListener("click", function (e) {
-        if (e.target === modalOverlay) {
-          console.log("Manual overlay click!");
-          app.closeSettings();
-        }
-      });
-      console.log("✅ Modal overlay event listener added");
-    }
-
-    // ESC key to close
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && app.showSettings) {
-        console.log("Manual ESC key pressed!");
-        app.closeSettings();
       }
     });
-    console.log("✅ ESC key event listener added");
   }
 
-  // Set up events immediately and also when modal opens
-  setupModalEvents();
-
-  // Also set up events whenever the modal becomes visible
-  const observer = new MutationObserver(function (mutations) {
-    mutations.forEach(function (mutation) {
-      if (
-        mutation.type === "attributes" &&
-        mutation.attributeName === "style"
-      ) {
-        const modal = document.querySelector(".modal-overlay");
-        if (modal && window.getComputedStyle(modal).display !== "none") {
-          setupModalEvents();
-        }
-      }
-    });
-  });
-
-  const modal = document.querySelector(".modal-overlay");
-  if (modal) {
-    observer.observe(modal, { attributes: true });
-  }
-});
-
-// Also add this CSS to prevent modal from blocking events
-const style = document.createElement("style");
-style.textContent = `
-  .modal-content {
-    pointer-events: auto !important;
-  }
-  .modal-content button {
-    pointer-events: auto !important;
-    cursor: pointer !important;
-  }
-`;
-document.head.appendChild(style);
+  console.log("✅ Button fixes applied");
+}, 1000);
