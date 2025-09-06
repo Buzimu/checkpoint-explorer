@@ -10,7 +10,6 @@ from typing import List, Dict, Optional, Callable, Tuple
 from dataclasses import dataclass, asdict
 
 from backend.config import Config
-from backend.database import db_manager
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +43,13 @@ class FileScannerService:
         Args:
             db_manager: Database manager instance
         """
-        self.db = db_manager or globals()['db_manager']
+        # Import here to avoid circular imports
+        if db_manager is None:
+            from backend.database import db_manager as default_db
+            self.db = default_db
+        else:
+            self.db = db_manager
+            
         self.supported_extensions = Config.SUPPORTED_EXTENSIONS
         self.type_patterns = Config.MODEL_TYPE_PATTERNS
         self.progress_callback: Optional[Callable] = None
@@ -271,7 +276,8 @@ class FileScannerService:
             'added': len(added),
             'updated': len(updated),
             'removed': len(removed),
-            'by_type': {}
+            'by_type': {},
+            'completed_at': datetime.utcnow().isoformat()
         }
         
         # Count by type

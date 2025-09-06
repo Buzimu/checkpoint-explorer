@@ -1,125 +1,99 @@
 """
-Directory scanning API endpoints
+Notes API endpoints
 """
-import os
 from flask import Blueprint, jsonify, request
-from threading import Thread
 
-from backend.services.file_scanner import file_scanner
+from backend.services.notes_service import notes_service
 from backend.database import db_manager
-from backend.config import Config
+from backend.utils.validators import validate_model_id, validate_notes_content
 
-scan_bp = Blueprint('scan', __name__)
-
-# Global scan status (in production, use Redis or similar)
-scan_status = {
-    'active': False,
-    'progress': 0,
-    'total': 0,
-    'current_file': '',
-    'message': '',
-    'errors': []
-}
+notes_bp = Blueprint('notes', __name__)
 
 
-def progress_callback(current: int, total: int, filename: str):
-    """Update scan progress"""
-    global scan_status
-    scan_status['progress'] = current
-    scan_status['total'] = total
-    scan_status['current_file'] = filename
-    scan_status['message'] = f'Processing {filename}... ({current}/{total})'
-
-
-def run_scan(directory: str, recursive: bool = True):
-    """Run scan in background thread"""
-    global scan_status
-    
+@notes_bp.route('/<model_id>', methods=['GET'])
+def get_notes(model_id: str):
+    """Get notes for a specific model"""
     try:
-        scan_status['active'] = True
-        scan_status['message'] = 'Starting scan...'
+        if not validate_model_id(model_id):
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid model ID format'
+            }), 400
         
-        # Perform scan
-        models, stats = file_scanner.scan_directory(
-            directory,
-            recursive=recursive,
-            progress_callback=progress_callback
-        )
-        
-        # Update user settings
-        settings = Config.get_user_settings()
-        settings['models_directory'] = directory
-        settings['last_scan'] = stats.get('completed_at')
-        Config.save_user_settings(settings)
-        
-        scan_status['message'] = f'Scan complete! Found {len(models)} models'
-        scan_status['stats'] = stats
+        result = notes_service.get_notes(model_id)
+        return jsonify(result)
         
     except Exception as e:
-        scan_status['message'] = f'Scan failed: {str(e)}'
-        scan_status['errors'].append(str(e))
-        
-    finally:
-        scan_status['active'] = False
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 
-@scan_bp.route('/', methods=['POST'])
-def start_scan():
-    """Start a directory scan"""
+@notes_bp.route('/<model_id>', methods=['POST'])
+def save_notes(model_id: str):
+    """Save notes for a specific model"""
     try:
-        data = request.get_json() or {}
-        directory = data.get('directory', '').strip()
-        recursive = data.get('recursive', True)
-        
-        # Use saved directory if none provided
-        if not directory:
-            settings = Config.get_user_settings()
-            directory = settings.get('models_directory')
-        
-        if not directory:
+        if not validate_model_id(model_id):
             return jsonify({
                 'status': 'error',
-                'message': 'No directory specified'
+                'message': 'Invalid model ID format'
             }), 400
         
-        if not os.path.exists(directory):
+        data = request.get_json()
+        if not data:
             return jsonify({
                 'status': 'error',
-                'message': f'Directory not found: {directory}'
+                'message': 'No data provided'
+            }), 400
+        
+        content = data.get('content', '')
+        create_backup = data.get('create_backup', True)
+        
+        # Validate notes content
+        validation = validate_notes_content(content)
+        if not validation['valid']:
+            return jsonify({
+                'status': 'error',
+                'message': validation['message']
+            }), 400
+        
+        result = notes_service.save_notes(model_id, content, create_backup)
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@notes_bp.route('/<model_id>/template/<template_type>', methods=['GET'])
+def get_notes_template(model_id: str, template_type: str):
+    """Get a formatted template for a specific model"""
+    try:
+        if not validate_model_id(model_id):
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid model ID format'
+            }), 400
+        
+        # Get model data for template variables
+        model = db_manager.get_model(model_id)
+        
+        if not model:
+            return jsonify({
+                'status': 'error',
+                'message': 'Model not found'
             }), 404
         
-        if not os.path.isdir(directory):
-            return jsonify({
-                'status': 'error',
-                'message': 'Path is not a directory'
-            }), 400
-        
-        # Check if scan is already running
-        if scan_status['active']:
-            return jsonify({
-                'status': 'error',
-                'message': 'Scan already in progress'
-            }), 409
-        
-        # Reset scan status
-        scan_status.update({
-            'active': True,
-            'progress': 0,
-            'total': 0,
-            'current_file': '',
-            'message': 'Initializing scan...',
-            'errors': []
-        })
-        
-        # Start scan in background thread
-        thread = Thread(target=run_scan, args=(directory, recursive))
-        thread.daemon = True
-        thread.start()
+        template_content = notes_service.get_template(template_type, model)
         
         return jsonify({
             'status': 'success',
-            'message': 'Scan started',
-            'directory': directory
+            'template_type': template_type,
+            'content': template_content,
+            'model_name': model['name']
         })
         
     except Exception as e:
@@ -129,83 +103,15 @@ def start_scan():
         }), 500
 
 
-@scan_bp.route('/status', methods=['GET'])
-def get_scan_status():
-    """Get current scan status"""
-    return jsonify({
-        'status': 'success',
-        'scan': scan_status
-    })
-
-
-@scan_bp.route('/validate', methods=['POST'])
-def validate_directory():
-    """Validate a directory before scanning"""
+@notes_bp.route('/templates', methods=['GET'])
+def get_available_templates():
+    """Get list of available note templates"""
     try:
-        data = request.get_json() or {}
-        directory = data.get('directory', '').strip()
-        
-        if not directory:
-            return jsonify({
-                'valid': False,
-                'message': 'Directory path is required'
-            }), 400
-        
-        if not os.path.exists(directory):
-            return jsonify({
-                'valid': False,
-                'message': 'Directory does not exist'
-            }), 404
-        
-        if not os.path.isdir(directory):
-            return jsonify({
-                'valid': False,
-                'message': 'Path is not a directory'
-            }), 400
-        
-        # Quick check for model files
-        has_models = False
-        count = 0
-        
-        for root, dirs, files in os.walk(directory):
-            for file in files[:50]:  # Check first 50 files
-                if any(file.lower().endswith(ext) for ext in Config.SUPPORTED_EXTENSIONS):
-                    has_models = True
-                    count += 1
-                    if count >= 5:
-                        break
-            if count >= 5:
-                break
-        
-        if not has_models:
-            return jsonify({
-                'valid': True,
-                'message': 'Directory exists but no model files found',
-                'warning': True
-            })
-        
-        return jsonify({
-            'valid': True,
-            'message': f'Directory looks good! Found {count}+ model files'
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'valid': False,
-            'message': str(e)
-        }), 500
-
-
-@scan_bp.route('/history', methods=['GET'])
-def get_scan_history():
-    """Get scan history"""
-    try:
-        limit = request.args.get('limit', 10, type=int)
-        history = db_manager.get_scan_history(limit)
+        templates = notes_service.get_available_templates()
         
         return jsonify({
             'status': 'success',
-            'history': history
+            'templates': templates
         })
         
     except Exception as e:
@@ -215,40 +121,111 @@ def get_scan_history():
         }), 500
 
 
-@scan_bp.route('/refresh', methods=['POST'])
-def refresh_models():
-    """Quick refresh of current directory"""
+@notes_bp.route('/<model_id>/backups', methods=['GET'])
+def get_notes_backups(model_id: str):
+    """Get available backups for a model's notes"""
     try:
-        settings = Config.get_user_settings()
-        directory = settings.get('models_directory')
-        
-        if not directory:
+        if not validate_model_id(model_id):
             return jsonify({
                 'status': 'error',
-                'message': 'No models directory configured'
+                'message': 'Invalid model ID format'
             }), 400
         
-        if not os.path.exists(directory):
-            return jsonify({
-                'status': 'error',
-                'message': f'Directory not found: {directory}'
-            }), 404
-        
-        # Check if scan is already running
-        if scan_status['active']:
-            return jsonify({
-                'status': 'error',
-                'message': 'Scan already in progress'
-            }), 409
-        
-        # Start refresh scan
-        thread = Thread(target=run_scan, args=(directory, True))
-        thread.daemon = True
-        thread.start()
+        backups = notes_service.get_backups(model_id)
         
         return jsonify({
             'status': 'success',
-            'message': 'Refresh started'
+            'backups': backups,
+            'model_id': model_id
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@notes_bp.route('/<model_id>/restore', methods=['POST'])
+def restore_notes_backup(model_id: str):
+    """Restore a backup for a model's notes"""
+    try:
+        if not validate_model_id(model_id):
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid model ID format'
+            }), 400
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'status': 'error',
+                'message': 'No restore data provided'
+            }), 400
+        
+        backup_id = data.get('backup_id')
+        backup_filename = data.get('backup_filename')
+        
+        if not backup_id and not backup_filename:
+            return jsonify({
+                'status': 'error',
+                'message': 'Either backup_id or backup_filename is required'
+            }), 400
+        
+        result = notes_service.restore_backup(model_id, backup_id, backup_filename)
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@notes_bp.route('/export', methods=['GET'])
+def export_all_notes():
+    """Export all notes for backup or migration"""
+    try:
+        result = notes_service.export_all_notes()
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
+@notes_bp.route('/<model_id>/statistics', methods=['GET'])
+def get_notes_statistics(model_id: str):
+    """Get statistics about a model's notes"""
+    try:
+        if not validate_model_id(model_id):
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid model ID format'
+            }), 400
+        
+        notes_data = notes_service.get_notes(model_id)
+        
+        if notes_data['status'] != 'success':
+            return jsonify(notes_data)
+        
+        # Get additional statistics
+        history = db_manager.get_notes_history(model_id)
+        
+        statistics = {
+            'char_count': notes_data.get('char_count', 0),
+            'word_count': notes_data.get('word_count', 0),
+            'line_count': len(notes_data.get('content', '').splitlines()),
+            'history_count': len(history),
+            'last_modified': notes_data.get('last_modified'),
+            'has_backups': len(notes_data.get('backups', [])) > 0
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'statistics': statistics
         })
         
     except Exception as e:

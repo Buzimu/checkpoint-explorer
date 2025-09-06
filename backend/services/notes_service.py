@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from backend.config import Config
-from backend.database import db_manager
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +157,13 @@ class NotesService:
         Args:
             db_manager: Database manager instance
         """
-        self.db = db_manager or globals()['db_manager']
+        # Import here to avoid circular imports
+        if db_manager is None:
+            from backend.database import db_manager as default_db
+            self.db = default_db
+        else:
+            self.db = db_manager
+            
         self.backup_dir = Config.BACKUP_DIR
         self.ensure_directories()
     
