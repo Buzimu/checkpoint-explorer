@@ -11,6 +11,302 @@ function modelExplorer() {
     loading: false,
     showSettings: false,
 
+    // Notes Editor
+    notesEditor: {
+      isOpen: false,
+      content: "",
+      originalContent: "",
+      isDirty: false,
+      autoSaveStatus: "saved", // 'saved', 'saving', 'dirty'
+      lastSaved: null,
+      charCount: 0,
+      wordCount: 0,
+      showTemplateDropdown: false,
+      backups: [],
+      templates: [
+        {
+          id: "checkpoint",
+          name: "Checkpoint Model",
+          description: "Standard template for checkpoint models",
+        },
+        {
+          id: "lora",
+          name: "LoRA Model",
+          description: "Template for LoRA fine-tuning models",
+        },
+        {
+          id: "vae",
+          name: "VAE Model",
+          description: "Template for VAE models",
+        },
+        {
+          id: "controlnet",
+          name: "ControlNet",
+          description: "Template for ControlNet models",
+        },
+        {
+          id: "embedding",
+          name: "Embedding",
+          description: "Template for textual inversions",
+        },
+      ],
+    },
+
+    // Add these methods to your modelExplorer() function:
+
+    closeNotesEditor() {
+      if (this.notesEditor.isDirty) {
+        const shouldClose = confirm(
+          "You have unsaved changes. Are you sure you want to close?"
+        );
+        if (!shouldClose) return;
+      }
+
+      this.notesEditor.isOpen = false;
+      this.notesEditor.content = "";
+      this.notesEditor.originalContent = "";
+      this.notesEditor.isDirty = false;
+      this.notesEditor.showTemplateDropdown = false;
+      console.log("📝 Notes editor closed");
+    },
+
+    async saveAndCloseNotes() {
+      const saveResult = await this.saveNotes();
+      if (saveResult) {
+        this.closeNotesEditor();
+      }
+    },
+
+    async saveNotes() {
+      if (!this.selectedModel) {
+        this.showNotification("No model selected", "error");
+        return false;
+      }
+
+      try {
+        this.notesEditor.autoSaveStatus = "saving";
+
+        const response = await fetch(`/api/notes/${this.selectedModel.id}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: this.notesEditor.content,
+            create_backup: true,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.status === "success") {
+          this.notesEditor.originalContent = this.notesEditor.content;
+          this.notesEditor.isDirty = false;
+          this.notesEditor.autoSaveStatus = "saved";
+          this.notesEditor.lastSaved = new Date();
+
+          // Update the model in the list
+          this.selectedModel.notes = this.notesEditor.content;
+          this.selectedModel.has_notes = Boolean(
+            this.notesEditor.content.trim()
+          );
+
+          this.showNotification("Notes saved successfully!", "success");
+          return true;
+        } else {
+          throw new Error(result.message || "Failed to save notes");
+        }
+      } catch (error) {
+        console.error("❌ Failed to save notes:", error);
+        this.notesEditor.autoSaveStatus = "dirty";
+        this.showNotification(
+          "Failed to save notes: " + error.message,
+          "error"
+        );
+        return false;
+      }
+    },
+
+    onNotesInput() {
+      const currentContent = this.notesEditor.content || "";
+      this.notesEditor.isDirty =
+        currentContent !== this.notesEditor.originalContent;
+      this.notesEditor.autoSaveStatus = this.notesEditor.isDirty
+        ? "dirty"
+        : "saved";
+      this.updateNotesStats();
+    },
+
+    updateNotesStats() {
+      const content = this.notesEditor.content || "";
+      this.notesEditor.charCount = content.length;
+      this.notesEditor.wordCount = content.trim()
+        ? content.trim().split(/\s+/).length
+        : 0;
+    },
+
+    getAutoSaveStatusText() {
+      switch (this.notesEditor.autoSaveStatus) {
+        case "saving":
+          return "Saving...";
+        case "dirty":
+          return "Unsaved changes";
+        case "saved":
+          return "All changes saved";
+        default:
+          return "Ready";
+      }
+    },
+
+    getAutoSaveStatusColor() {
+      switch (this.notesEditor.autoSaveStatus) {
+        case "saving":
+          return "#ffb86c";
+        case "dirty":
+          return "#ff5555";
+        case "saved":
+          return "#50fa7b";
+        default:
+          return "#6272a4";
+      }
+    },
+
+    handleNotesKeydown(event) {
+      // Save with Ctrl+S
+      if (event.ctrlKey && event.key === "s") {
+        event.preventDefault();
+        this.saveNotes();
+      }
+
+      // Close with Escape (if no unsaved changes)
+      if (event.key === "Escape" && !this.notesEditor.isDirty) {
+        this.closeNotesEditor();
+      }
+    },
+
+    // Template functions
+    toggleTemplateDropdown() {
+      this.notesEditor.showTemplateDropdown =
+        !this.notesEditor.showTemplateDropdown;
+    },
+
+    async applyTemplate(templateId) {
+      if (!this.selectedModel) return;
+
+      try {
+        const response = await fetch(
+          `/api/notes/${this.selectedModel.id}/template/${templateId}`
+        );
+        if (response.ok) {
+          const result = await response.json();
+          this.notesEditor.content = result.content;
+          this.onNotesInput();
+          this.notesEditor.showTemplateDropdown = false;
+          this.showNotification(`Applied ${templateId} template`, "success");
+        }
+      } catch (error) {
+        console.error("Failed to apply template:", error);
+        this.showNotification("Failed to apply template", "error");
+      }
+    },
+
+    // Formatting functions
+    insertFormatting(before, after) {
+      const textarea = document.getElementById("notesTextarea");
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selectedText = textarea.value.substring(start, end);
+
+      const replacement = before + selectedText + after;
+      const newContent =
+        textarea.value.substring(0, start) +
+        replacement +
+        textarea.value.substring(end);
+
+      this.notesEditor.content = newContent;
+      this.onNotesInput();
+
+      // Restore cursor position
+      setTimeout(() => {
+        const newCursorPos = selectedText
+          ? start + before.length + selectedText.length + after.length
+          : start + before.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+      }, 0);
+    },
+
+    insertText(text) {
+      const textarea = document.getElementById("notesTextarea");
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      const newContent =
+        textarea.value.substring(0, start) +
+        text +
+        textarea.value.substring(end);
+      this.notesEditor.content = newContent;
+      this.onNotesInput();
+
+      // Set cursor position after inserted text
+      setTimeout(() => {
+        const newCursorPos = start + text.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+      }, 0);
+    },
+
+    async restoreBackup(backupFilename) {
+      if (!this.selectedModel) return;
+
+      try {
+        const response = await fetch(
+          `/api/notes/${this.selectedModel.id}/restore`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              backup_filename: backupFilename,
+            }),
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          // Reload the notes content
+          const notesResponse = await fetch(
+            `/api/notes/${this.selectedModel.id}`
+          );
+          if (notesResponse.ok) {
+            const notesData = await notesResponse.json();
+            this.notesEditor.content = notesData.content || "";
+            this.notesEditor.originalContent = this.notesEditor.content;
+            this.notesEditor.isDirty = false;
+            this.updateNotesStats();
+            this.showNotification("Backup restored successfully!", "success");
+          }
+        } else {
+          throw new Error("Failed to restore backup");
+        }
+      } catch (error) {
+        console.error("Failed to restore backup:", error);
+        this.showNotification(
+          "Failed to restore backup: " + error.message,
+          "error"
+        );
+      }
+    },
+
     // Settings form
     settingsForm: {
       models_directory: "",
@@ -360,11 +656,48 @@ function modelExplorer() {
         this.showNotification("Opening model folder...", "info");
       }
     },
+    // Notes Editor Functions
+    async editNotes() {
+      if (!this.selectedModel) {
+        this.showNotification("No model selected", "warning");
+        return;
+      }
 
-    editNotes() {
-      if (this.selectedModel) {
-        console.log(`📝 Editing notes for: ${this.selectedModel.name}`);
-        this.showNotification("Notes editor coming soon...", "info");
+      console.log(`📝 Opening notes editor for: ${this.selectedModel.name}`);
+
+      try {
+        // Load existing notes from server
+        const response = await fetch(`/api/notes/${this.selectedModel.id}`);
+        if (response.ok) {
+          const notesData = await response.json();
+          this.notesEditor.content = notesData.content || "";
+          this.notesEditor.originalContent = this.notesEditor.content;
+          this.notesEditor.backups = notesData.backups || [];
+        } else {
+          // Start with empty notes if none exist
+          this.notesEditor.content = "";
+          this.notesEditor.originalContent = "";
+          this.notesEditor.backups = [];
+        }
+
+        this.notesEditor.isOpen = true;
+        this.notesEditor.isDirty = false;
+        this.notesEditor.autoSaveStatus = "saved";
+        this.updateNotesStats();
+
+        // Focus the textarea after opening
+        setTimeout(() => {
+          const textarea = document.getElementById("notesTextarea");
+          if (textarea) {
+            textarea.focus();
+          }
+        }, 100);
+      } catch (error) {
+        console.error("❌ Failed to load notes:", error);
+        this.showNotification(
+          "Failed to load notes: " + error.message,
+          "error"
+        );
       }
     },
 
@@ -682,6 +1015,145 @@ setTimeout(() => {
       }
     });
   }
+
+  // Add this to the setTimeout block in main.js where you fix the other buttons
+
+  // Fix notes editor buttons
+  setTimeout(() => {
+    console.log("🔧 Setting up notes editor button fixes...");
+
+    // Get the Alpine.js app instance (same function as before)
+    function getApp() {
+      const container = document.querySelector('[x-data="modelExplorer()"]');
+      return container && container._x_dataStack
+        ? container._x_dataStack[0]
+        : null;
+    }
+
+    // Check for notes editor elements periodically since they're in a modal
+    const setupNotesEditorFixes = () => {
+      // Fix notes editor close button
+      const notesCloseBtn = document.querySelector(
+        ".notes-editor-modal .modal-close"
+      );
+      if (notesCloseBtn && !notesCloseBtn._eventFixed) {
+        notesCloseBtn._eventFixed = true;
+        notesCloseBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          const app = getApp();
+          if (app && app.closeNotesEditor) {
+            app.closeNotesEditor();
+          }
+        });
+      }
+
+      // Fix notes editor cancel button
+      const notesCancelBtn = document.querySelector(
+        ".notes-editor-footer .btn-secondary"
+      );
+      if (notesCancelBtn && !notesCancelBtn._eventFixed) {
+        notesCancelBtn._eventFixed = true;
+        notesCancelBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          const app = getApp();
+          if (app && app.closeNotesEditor) {
+            app.closeNotesEditor();
+          }
+        });
+      }
+
+      // Fix notes editor save button
+      const notesSaveBtn = document.querySelector(
+        ".notes-editor-footer .btn-primary"
+      );
+      if (notesSaveBtn && !notesSaveBtn._eventFixed) {
+        notesSaveBtn._eventFixed = true;
+        notesSaveBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          const app = getApp();
+          if (app && app.saveAndCloseNotes) {
+            app.saveAndCloseNotes();
+          }
+        });
+      }
+
+      // Fix template dropdown button
+      const templateBtn = document.querySelector(".template-btn");
+      if (templateBtn && !templateBtn._eventFixed) {
+        templateBtn._eventFixed = true;
+        templateBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+          const app = getApp();
+          if (app && app.toggleTemplateDropdown) {
+            app.toggleTemplateDropdown();
+          }
+        });
+      }
+
+      // Fix formatting buttons
+      const formatBtns = document.querySelectorAll(".toolbar-btn");
+      formatBtns.forEach((btn) => {
+        if (!btn._eventFixed && btn.title) {
+          btn._eventFixed = true;
+          btn.addEventListener("click", function (e) {
+            e.preventDefault();
+            const app = getApp();
+            if (!app) return;
+
+            // Handle different formatting buttons based on their title
+            const title = btn.title.toLowerCase();
+            if (title.includes("bold")) {
+              app.insertFormatting("**", "**");
+            } else if (title.includes("italic")) {
+              app.insertFormatting("*", "*");
+            } else if (title.includes("code")) {
+              app.insertFormatting("`", "`");
+            } else if (title.includes("heading")) {
+              app.insertFormatting("## ", "");
+            } else if (title.includes("list")) {
+              app.insertFormatting("- ", "");
+            } else if (title.includes("separator")) {
+              app.insertText("\n---\n");
+            }
+          });
+        }
+      });
+
+      // Fix template items
+      const templateItems = document.querySelectorAll(".template-item");
+      templateItems.forEach((item) => {
+        if (!item._eventFixed) {
+          item._eventFixed = true;
+          item.addEventListener("click", function (e) {
+            e.preventDefault();
+            const app = getApp();
+            if (app && app.applyTemplate) {
+              // Get template ID from the item (you'll need to add data attribute)
+              const templateName =
+                item.querySelector(".template-name")?.textContent;
+              const templateMap = {
+                "Checkpoint Model": "checkpoint",
+                "LoRA Model": "lora",
+                "VAE Model": "vae",
+                ControlNet: "controlnet",
+                Embedding: "embedding",
+              };
+              const templateId = templateMap[templateName];
+              if (templateId) {
+                app.applyTemplate(templateId);
+              }
+            }
+          });
+        }
+      });
+    };
+
+    // Set up initial fixes and then check periodically for modal elements
+    setupNotesEditorFixes();
+    setInterval(setupNotesEditorFixes, 1000);
+
+    console.log("✅ Notes editor button fixes applied");
+  }, 1000);
 
   console.log("✅ Button fixes applied");
 }, 1000);
