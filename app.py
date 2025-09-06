@@ -36,143 +36,143 @@ class NotesService:
     TEMPLATES = {
         'checkpoint': '''# {model_name}
 
-## Model Information
-- **Type:** Checkpoint Model
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **Resolution:** 512x512 / 768x768 / 1024x1024
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** Checkpoint Model
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **Resolution:** 512x512 / 768x768 / 1024x1024
+        - **File Size:** {file_size}
 
-## Recommended Settings
-- **Sampler:** DPM++ 2M Karras
-- **Steps:** 20-30
-- **CFG Scale:** 7-9
-- **Clip Skip:** 1-2
+        ## Recommended Settings
+        - **Sampler:** DPM++ 2M Karras
+        - **Steps:** 20-30
+        - **CFG Scale:** 7-9
+        - **Clip Skip:** 1-2
 
-## Usage Notes
-- **Best for:** [Describe what this model excels at]
-- **Style:** [Artistic style or theme]
-- **Trigger Words:** [Any specific trigger words]
+        ## Usage Notes
+        - **Best for:** [Describe what this model excels at]
+        - **Style:** [Artistic style or theme]
+        - **Trigger Words:** [Any specific trigger words]
 
-## My Experience
-- **Quality:** ⭐⭐⭐⭐⭐
-- **Ease of Use:** ⭐⭐⭐⭐⭐
-- **Notes:** [Your personal notes and findings]
+        ## My Experience
+        - **Quality:** ⭐⭐⭐⭐⭐
+        - **Ease of Use:** ⭐⭐⭐⭐⭐
+        - **Notes:** [Your personal notes and findings]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'lora': '''# {model_name}
+                'lora': '''# {model_name}
 
-## Model Information
-- **Type:** LoRA (Low-Rank Adaptation)
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **Trigger Weight:** 0.5 - 1.0
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** LoRA (Low-Rank Adaptation)
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **Trigger Weight:** 0.5 - 1.0
+        - **File Size:** {file_size}
 
-## Usage Instructions
-- **Trigger Words:** [Required trigger words]
-- **Recommended Weight:** 0.7-0.8
-- **Best Prompts:** [Example prompts that work well]
+        ## Usage Instructions
+        - **Trigger Words:** [Required trigger words]
+        - **Recommended Weight:** 0.7-0.8
+        - **Best Prompts:** [Example prompts that work well]
 
-## Settings
-- **Works well with:** [Compatible checkpoints]
-- **Avoid:** [Incompatible models or settings]
+        ## Settings
+        - **Works well with:** [Compatible checkpoints]
+        - **Avoid:** [Incompatible models or settings]
 
-## Examples
-- [Add your successful prompt examples here]
+        ## Examples
+        - [Add your successful prompt examples here]
 
-## My Notes
-- **Quality:** ⭐⭐⭐⭐⭐
-- **Versatility:** ⭐⭐⭐⭐⭐
-- **Personal Notes:** [Your experience and tips]
+        ## My Notes
+        - **Quality:** ⭐⭐⭐⭐⭐
+        - **Versatility:** ⭐⭐⭐⭐⭐
+        - **Personal Notes:** [Your experience and tips]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'vae': '''# {model_name}
+                'vae': '''# {model_name}
 
-## Model Information
-- **Type:** VAE (Variational Autoencoder)
-- **Compatible with:** SD 1.5 / SD 2.1 / SDXL
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** VAE (Variational Autoencoder)
+        - **Compatible with:** SD 1.5 / SD 2.1 / SDXL
+        - **File Size:** {file_size}
 
-## Purpose & Usage
-- **Improves:** [Color accuracy, detail, contrast, etc.]
-- **Best for:** [Types of images this VAE works best with]
-- **Comparison:** [How it compares to other VAEs]
+        ## Purpose & Usage
+        - **Improves:** [Color accuracy, detail, contrast, etc.]
+        - **Best for:** [Types of images this VAE works best with]
+        - **Comparison:** [How it compares to other VAEs]
 
-## Technical Notes
-- **Resolution:** [Optimal resolution settings]
-- **Performance:** [Impact on generation speed]
-- **Memory Usage:** [VRAM requirements]
+        ## Technical Notes
+        - **Resolution:** [Optimal resolution settings]
+        - **Performance:** [Impact on generation speed]
+        - **Memory Usage:** [VRAM requirements]
 
-## My Experience
-- **Visual Quality:** ⭐⭐⭐⭐⭐
-- **Performance Impact:** ⭐⭐⭐⭐⭐
-- **Notes:** [Your observations and comparisons]
+        ## My Experience
+        - **Visual Quality:** ⭐⭐⭐⭐⭐
+        - **Performance Impact:** ⭐⭐⭐⭐⭐
+        - **Notes:** [Your observations and comparisons]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'controlnet': '''# {model_name}
+                'controlnet': '''# {model_name}
 
-## Model Information
-- **Type:** ControlNet
-- **Control Type:** [Canny, Depth, OpenPose, etc.]
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** ControlNet
+        - **Control Type:** [Canny, Depth, OpenPose, etc.]
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **File Size:** {file_size}
 
-## Usage Settings
-- **Control Weight:** 0.8-1.2
-- **Starting Step:** 0
-- **Ending Step:** 1.0
-- **Preprocessor:** [Required preprocessor]
+        ## Usage Settings
+        - **Control Weight:** 0.8-1.2
+        - **Starting Step:** 0
+        - **Ending Step:** 1.0
+        - **Preprocessor:** [Required preprocessor]
 
-## Best Use Cases
-- [Describe what this ControlNet is best for]
-- [Mention any specific scenarios]
+        ## Best Use Cases
+        - [Describe what this ControlNet is best for]
+        - [Mention any specific scenarios]
 
-## Tips & Tricks
-- [Your personal tips for using this ControlNet]
-- [Common issues and solutions]
+        ## Tips & Tricks
+        - [Your personal tips for using this ControlNet]
+        - [Common issues and solutions]
 
-## My Experience
-- **Accuracy:** ⭐⭐⭐⭐⭐
-- **Ease of Use:** ⭐⭐⭐⭐⭐
-- **Notes:** [Your findings and recommendations]
+        ## My Experience
+        - **Accuracy:** ⭐⭐⭐⭐⭐
+        - **Ease of Use:** ⭐⭐⭐⭐⭐
+        - **Notes:** [Your findings and recommendations]
 
----
-*Last updated: {date}*''',
+        ---
+        *Last updated: {date}*''',
 
-        'embedding': '''# {model_name}
+                'embedding': '''# {model_name}
 
-## Model Information
-- **Type:** Textual Inversion / Embedding
-- **Base Model:** SD 1.5 / SD 2.1 / SDXL
-- **Vectors:** [Number of vectors]
-- **File Size:** {file_size}
+        ## Model Information
+        - **Type:** Textual Inversion / Embedding
+        - **Base Model:** SD 1.5 / SD 2.1 / SDXL
+        - **Vectors:** [Number of vectors]
+        - **File Size:** {file_size}
 
-## Usage Instructions
-- **Trigger Word:** {model_name}
-- **Placement:** [Beginning, end, or middle of prompt]
-- **Weight:** Usually 1.0 (can be adjusted)
+        ## Usage Instructions
+        - **Trigger Word:** {model_name}
+        - **Placement:** [Beginning, end, or middle of prompt]
+        - **Weight:** Usually 1.0 (can be adjusted)
 
-## Purpose
-- **Effect:** [What this embedding does]
-- **Style:** [Artistic style or effect it provides]
+        ## Purpose
+        - **Effect:** [What this embedding does]
+        - **Style:** [Artistic style or effect it provides]
 
-## Example Prompts
-```
-[Add your successful prompt examples here]
-```
+        ## Example Prompts
+        ```
+        [Add your successful prompt examples here]
+        ```
 
-## My Notes
-- **Effectiveness:** ⭐⭐⭐⭐⭐
-- **Versatility:** ⭐⭐⭐⭐⭐
-- **Personal Tips:** [Your experience and usage tips]
+        ## My Notes
+        - **Effectiveness:** ⭐⭐⭐⭐⭐
+        - **Versatility:** ⭐⭐⭐⭐⭐
+        - **Personal Tips:** [Your experience and usage tips]
 
----
-*Last updated: {date}*'''
+        ---
+        *Last updated: {date}*'''
     }
     
     def __init__(self):
