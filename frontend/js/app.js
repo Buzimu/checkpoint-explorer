@@ -159,6 +159,24 @@ class ModelExplorerApp {
       await this.startScan(event.detail);
     });
 
+    setInterval(() => {
+      const settingsBtn = document.getElementById("settings-btn");
+      if (settingsBtn && !settingsBtn._listenerAttached) {
+        settingsBtn._listenerAttached = true;
+        settingsBtn.addEventListener("click", () => {
+          this.components.settingsModal.open();
+        });
+      }
+
+      const configureBtn = document.getElementById("configure-btn");
+      if (configureBtn && !configureBtn._listenerAttached) {
+        configureBtn._listenerAttached = true;
+        configureBtn.addEventListener("click", () => {
+          this.components.settingsModal.open();
+        });
+      }
+    }, 500);
+
     console.log("🎯 Event listeners configured");
   }
 

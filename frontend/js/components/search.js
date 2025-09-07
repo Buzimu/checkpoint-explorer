@@ -94,27 +94,41 @@ export class SearchBar {
     );
   }
 
+  // Fix the handleTypeFilter method to properly update active states
   handleTypeFilter(type) {
     const currentFilters = this.store.getState("filters");
+
+    // Update store
     this.store.setState({
       filters: {
         ...currentFilters,
         type: type,
       },
     });
+
+    // Update UI immediately
+    this.updateFilterButtons(type);
+  }
+
+  updateFilterButtons(activeType) {
+    this.typeFilters.forEach((filter) => {
+      const isActive = filter.dataset.type === activeType;
+      if (isActive) {
+        filter.classList.add("active");
+      } else {
+        filter.classList.remove("active");
+      }
+    });
   }
 
   updateUI(filters) {
     // Update search input if needed
-    if (this.searchInput.value !== filters.search) {
+    if (this.searchInput && this.searchInput.value !== filters.search) {
       this.searchInput.value = filters.search || "";
     }
 
     // Update type filter buttons
-    this.typeFilters.forEach((filter) => {
-      const isActive = filter.dataset.type === filters.type;
-      filter.classList.toggle("active", isActive);
-    });
+    this.updateFilterButtons(filters.type || "all");
   }
 
   focus() {

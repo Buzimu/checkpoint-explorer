@@ -89,6 +89,7 @@ export class ModelList {
     `;
   }
 
+  // Make sure the filter comparison is case-insensitive and handles 'all'
   getFilteredModels(state) {
     let models = [...(state.models || [])];
     const filters = state.filters || {};
@@ -104,11 +105,29 @@ export class ModelList {
       );
     }
 
-    // Apply type filter
+    // Apply type filter - fixed comparison
     if (filters.type && filters.type !== "all") {
-      models = models.filter(
-        (m) => m.type.toLowerCase() === filters.type.toLowerCase()
-      );
+      models = models.filter((m) => {
+        // Handle different case variations
+        const modelType = (m.type || "").toLowerCase();
+        const filterType = filters.type.toLowerCase();
+
+        // Map common variations
+        const typeMap = {
+          checkpoint: ["checkpoint", "ckpt"],
+          lora: ["lora"],
+          vae: ["vae"],
+          controlnet: ["controlnet", "control"],
+          embedding: ["embedding", "textual inversion", "ti"],
+        };
+
+        // Check if model type matches filter
+        if (typeMap[filterType]) {
+          return typeMap[filterType].some((t) => modelType.includes(t));
+        }
+
+        return modelType === filterType;
+      });
     }
 
     // Apply has notes filter

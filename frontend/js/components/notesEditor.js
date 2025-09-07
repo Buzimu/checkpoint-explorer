@@ -173,6 +173,7 @@ Tips:
     });
   }
 
+  // In the open method, make sure we're using flex display
   async open(model) {
     if (!model) return;
 
@@ -203,8 +204,15 @@ Tips:
       this.originalContent = "";
     }
 
-    // Show modal
+    // Show modal with flex display for centering
     this.container.style.display = "flex";
+    this.container.style.position = "fixed";
+    this.container.style.top = "0";
+    this.container.style.left = "0";
+    this.container.style.right = "0";
+    this.container.style.bottom = "0";
+    this.container.style.alignItems = "center";
+    this.container.style.justifyContent = "center";
 
     // Focus textarea
     setTimeout(() => {

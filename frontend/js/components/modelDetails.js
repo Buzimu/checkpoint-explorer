@@ -145,6 +145,9 @@ export class ModelDetails {
         document.dispatchEvent(new CustomEvent("settings:open"));
       });
     }
+
+    // Update action buttons for no selection state
+    this.updateActionButtons(null);
   }
 
   renderGallerySection(model) {
@@ -201,6 +204,24 @@ export class ModelDetails {
   updateActionButtons(model) {
     const actionButtons = document.getElementById("action-buttons");
     if (!actionButtons) return;
+
+    // If no model selected, show configure button
+    if (!model) {
+      actionButtons.innerHTML = `
+        <button class="btn btn-primary" id="configure-btn">
+          ⚙️ Configure Models Directory
+        </button>
+      `;
+
+      // Attach event for configure button
+      const configBtn = document.getElementById("configure-btn");
+      if (configBtn) {
+        configBtn.addEventListener("click", () => {
+          document.dispatchEvent(new CustomEvent("settings:open"));
+        });
+      }
+      return;
+    }
 
     actionButtons.innerHTML = `
       <button class="btn btn-secondary" id="open-folder-btn" title="Open model folder">
