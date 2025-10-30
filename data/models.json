@@ -1,0 +1,139 @@
+[
+  {
+    "id": "a1b2c3d4e5f6",
+    "name": "RealisticVision_v5",
+    "filename": "RealisticVision_v5.safetensors",
+    "path": "J:\\AI\\Image Models\\models\\checkpoints\\RealisticVision_v5.safetensors",
+    "type": "checkpoint",
+    "size": 2132654080,
+    "size_formatted": "2.03 GB",
+    "modified": "2025-10-15T14:30:00",
+    "preview_image": null,
+    "preview_video": null,
+    "has_video": false,
+    "rating": "pg",
+    "notes": "Realistic Vision V5.0\n\nRecommended settings:\n- Use DPM++ 2M Karras sampler\n- Steps: 20-30\n- CFG Scale: 7\n- Negative prompt: (worst quality, low quality:1.4)\n\nWorks great for portraits and realistic scenes.",
+    "settings": {
+      "resolution": "512x768",
+      "sampler": "DPM++ 2M Karras",
+      "steps": "25",
+      "cfg_scale": "7.0",
+      "clip_skip": "1"
+    },
+    "links": {
+      "civitai": "https://civitai.com/models/4201/realistic-vision-v50",
+      "huggingface": "",
+      "github": "",
+      "custom": ""
+    },
+    "tags": ["realistic", "portraits", "photography"]
+  },
+  {
+    "id": "f6e5d4c3b2a1",
+    "name": "add_detail_lora",
+    "filename": "add_detail_lora.safetensors",
+    "path": "J:\\AI\\Image Models\\models\\loras\\add_detail_lora.safetensors",
+    "type": "lora",
+    "size": 143654912,
+    "size_formatted": "137.00 MB",
+    "modified": "2025-09-20T10:15:00",
+    "preview_image": null,
+    "preview_video": null,
+    "has_video": false,
+    "rating": "pg",
+    "notes": "Add Detail LoRA\n\nUse this to enhance fine details in your images.\nRecommended weight: 0.5-0.8",
+    "settings": {
+      "weight": "0.7",
+      "resolution": "512x512",
+      "trigger_words": ""
+    },
+    "links": {
+      "civitai": "https://civitai.com/models/82098/add-detail-lora",
+      "huggingface": "",
+      "github": "",
+      "custom": ""
+    },
+    "tags": ["detail", "enhancement", "quality"]
+  },
+  {
+    "id": "9876543210ab",
+    "name": "DreamShaper_8",
+    "filename": "DreamShaper_8.safetensors",
+    "path": "J:\\AI\\Image Models\\models\\checkpoints\\DreamShaper_8.safetensors",
+    "type": "checkpoint",
+    "size": 2082654720,
+    "size_formatted": "1.94 GB",
+    "modified": "2025-08-05T16:45:00",
+    "preview_image": null,
+    "preview_video": null,
+    "has_video": false,
+    "rating": "pg",
+    "notes": "DreamShaper 8 - General purpose model\n\nGood for:\n- Fantasy art\n- Concept art\n- Character designs\n\nVery versatile and forgiving.",
+    "settings": {
+      "resolution": "768x768",
+      "sampler": "Euler a",
+      "steps": "20",
+      "cfg_scale": "7.5",
+      "clip_skip": "2"
+    },
+    "links": {
+      "civitai": "https://civitai.com/models/4384/dreamshaper",
+      "huggingface": "",
+      "github": "",
+      "custom": ""
+    },
+    "tags": ["general", "fantasy", "versatile"]
+  },
+  {
+    "id": "abc123def456",
+    "name": "control_v11p_sd15_openpose",
+    "filename": "control_v11p_sd15_openpose.pth",
+    "path": "J:\\AI\\Image Models\\models\\controlnet\\control_v11p_sd15_openpose.pth",
+    "type": "controlnet",
+    "size": 1456321789,
+    "size_formatted": "1.36 GB",
+    "modified": "2025-07-12T09:30:00",
+    "preview_image": null,
+    "preview_video": null,
+    "has_video": false,
+    "rating": "pg",
+    "notes": "OpenPose ControlNet\n\nUse for pose-guided generation.\nRequires OpenPose preprocessor.",
+    "settings": {
+      "preprocessor": "openpose_full",
+      "control_weight": "1.0",
+      "resolution": "512x512"
+    },
+    "links": {
+      "civitai": "",
+      "huggingface": "https://huggingface.co/lllyasviel/ControlNet-v1-1",
+      "github": "https://github.com/lllyasviel/ControlNet-v1-1-nightly",
+      "custom": ""
+    },
+    "tags": ["controlnet", "pose", "guidance"]
+  },
+  {
+    "id": "xyz789uvw123",
+    "name": "vae-ft-mse-840000-ema",
+    "filename": "vae-ft-mse-840000-ema-pruned.safetensors",
+    "path": "J:\\AI\\Image Models\\models\\vae\\vae-ft-mse-840000-ema-pruned.safetensors",
+    "type": "vae",
+    "size": 334643200,
+    "size_formatted": "319.16 MB",
+    "modified": "2025-06-18T11:20:00",
+    "preview_image": null,
+    "preview_video": null,
+    "has_video": false,
+    "rating": "pg",
+    "notes": "Standard SD 1.5 VAE\n\nRecommended for most SD 1.5 models to improve colors and reduce artifacts.",
+    "settings": {
+      "compatible_models": "SD 1.5 based models"
+    },
+    "links": {
+      "civitai": "",
+      "huggingface": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original",
+      "github": "",
+      "custom": ""
+    },
+    "tags": ["vae", "sd15", "standard"]
+  }
+]
