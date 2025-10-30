@@ -199,10 +199,10 @@ body {
     overflow-y: auto;
     padding: 24px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
     gap: 20px;
     align-content: start;
-    max-width: 100%;
+    justify-content: start;
 }
 
 /* Model Card */
@@ -214,8 +214,8 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     position: relative;
-    min-width: 250px;
-    max-width: 400px;
+    width: 100%;
+    min-height: 380px;
 }
 
 .model-card:hover {
@@ -236,24 +236,26 @@ body {
 
 .model-image {
     width: 100%;
-    aspect-ratio: 1;
+    height: 280px;
     object-fit: cover;
     background: rgba(68, 71, 90, 0.3);
+    display: block;
 }
 
 .model-placeholder {
     width: 100%;
-    aspect-ratio: 1;
+    height: 280px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, rgba(68, 71, 90, 0.3), rgba(98, 114, 164, 0.2));
-    font-size: 48px;
+    font-size: 64px;
     color: #6272a4;
 }
 
 .model-info {
-    padding: 12px;
+    padding: 16px;
+    min-height: 100px;
 }
 
 .model-header {
@@ -267,8 +269,13 @@ body {
     font-weight: 600;
     font-size: 14px;
     color: #f8f8f2;
-    line-height: 1.3;
+    line-height: 1.4;
     flex: 1;
+    min-height: 40px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .favorite-icon {
@@ -285,6 +292,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-height: 30px;
 }
 
 .model-type {
@@ -764,6 +772,10 @@ body {
     .details-sidebar {
         width: 350px;
     }
+    
+    .model-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 300px));
+    }
 }
 
 @media (max-width: 900px) {
@@ -776,5 +788,21 @@ body {
         height: 50vh;
         border-left: none;
         border-top: 2px solid #44475a;
+    }
+    
+    .model-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 280px));
+    }
+}
+
+@media (max-width: 600px) {
+    .model-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        padding: 16px;
+    }
+    
+    .model-image,
+    .model-placeholder {
+        height: 200px;
     }
 }
