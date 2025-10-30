@@ -4,8 +4,9 @@ class ModelExplorer {
     this.modelData = null;
     this.filteredModels = [];
     this.selectedModel = null;
-    this.nsfwFilterEnabled = true;
+    this.contentRating = "pg"; // pg, r, x
     this.isDirty = false;
+    this.serverMode = true; // Flask server mode
 
     this.init();
   }
@@ -13,20 +14,18 @@ class ModelExplorer {
   init() {
     // Setup event listeners
     document.getElementById("loadJsonBtn").addEventListener("click", () => {
-      document.getElementById("jsonFileInput").click();
-    });
-
-    document.getElementById("jsonFileInput").addEventListener("change", (e) => {
-      this.loadJsonFile(e.target.files[0]);
+      this.loadFromServer();
     });
 
     document.getElementById("exportJsonBtn").addEventListener("click", () => {
       this.exportJson();
     });
 
-    document.getElementById("nsfwToggle").addEventListener("click", () => {
-      this.toggleNsfwFilter();
-    });
+    document
+      .getElementById("contentRatingToggle")
+      .addEventListener("click", () => {
+        this.cycleContentRating();
+      });
 
     // Search and filter listeners
     document.getElementById("searchInput").addEventListener("input", () => {
@@ -60,63 +59,122 @@ class ModelExplorer {
       this.closeEditModal();
     });
 
+    // Image lightbox close
+    const lightbox = document.getElementById("imageLightbox");
+    if (lightbox) {
+      lightbox.addEventListener("click", (e) => {
+        if (
+          e.target === lightbox ||
+          e.target.classList.contains("lightbox-close")
+        ) {
+          this.closeLightbox();
+        }
+      });
+    }
+
     // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         this.closeEditModal();
+        this.closeLightbox();
       }
     });
 
-    // Warn on leave if dirty
-    window.addEventListener("beforeunload", (e) => {
-      if (this.isDirty) {
-        e.preventDefault();
-        e.returnValue =
-          "You have unsaved changes. Are you sure you want to leave?";
-      }
-    });
-
-    // Auto-save to localStorage
-    setInterval(() => {
-      if (this.modelData && this.isDirty) {
-        this.autoSave();
-      }
-    }, 30000); // Every 30 seconds
+    // Auto-load from server
+    this.loadFromServer();
   }
 
-  loadJsonFile(file) {
-    if (!file) return;
+  async loadFromServer() {
+    try {
+      const response = await fetch("/api/models");
+      if (!response.ok) throw new Error("Failed to load from server");
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target.result);
-        this.modelData = data;
-        this.isDirty = false; // Fresh load, no changes yet
-        this.processModels();
-        this.renderModelGrid();
-        this.updateModelCount();
+      const data = await response.json();
+      this.modelData = data;
+      this.mergeHighLowVariants(); // Merge HIGH/LOW variants
+      this.isDirty = false;
+      this.processModels();
+      this.renderModelGrid();
+      this.updateModelCount();
 
-        // Enable export button and reset text
-        const exportBtn = document.getElementById("exportJsonBtn");
-        exportBtn.disabled = false;
-        exportBtn.textContent = "💾 Export JSON";
-        exportBtn.title = "Export database to file";
+      // Enable export button
+      const exportBtn = document.getElementById("exportJsonBtn");
+      exportBtn.disabled = false;
+      exportBtn.textContent = "💾 Export JSON";
+      exportBtn.title = "Export database to file";
 
-        // Hide welcome screen
-        const welcomeScreen = document.getElementById("welcomeScreen");
-        if (welcomeScreen) {
-          welcomeScreen.remove();
-        }
-
-        console.log("✅ Loaded", Object.keys(data.models).length, "models");
-        this.showToast("✅ Database loaded successfully!");
-      } catch (error) {
-        alert("Error loading JSON file: " + error.message);
-        console.error("JSON parse error:", error);
+      // Hide welcome screen
+      const welcomeScreen = document.getElementById("welcomeScreen");
+      if (welcomeScreen) {
+        welcomeScreen.remove();
       }
-    };
-    reader.readAsText(file);
+
+      console.log(
+        "✅ Loaded from server:",
+        Object.keys(data.models).length,
+        "models"
+      );
+      this.showToast("✅ Database loaded from server!");
+    } catch (error) {
+      console.error("Failed to load from server:", error);
+      this.showToast("❌ Failed to connect to server");
+    }
+  }
+
+  mergeHighLowVariants() {
+    if (!this.modelData || !this.modelData.models) return;
+
+    const models = this.modelData.models;
+    const toMerge = {};
+    const toDelete = [];
+
+    // Find HIGH/LOW pairs
+    Object.keys(models).forEach((path) => {
+      if (path.includes("HIGH")) {
+        const lowPath = path.replace("HIGH", "LOW");
+        const basePath = path.replace("HIGH", "");
+
+        if (models[lowPath]) {
+          // Found a pair!
+          toMerge[basePath] = {
+            high: path,
+            low: lowPath,
+          };
+          toDelete.push(path, lowPath);
+        }
+      }
+    });
+
+    // Merge pairs
+    Object.entries(toMerge).forEach(([basePath, variants]) => {
+      const highModel = models[variants.high];
+      const lowModel = models[variants.low];
+
+      // Create merged model, prefer HIGH data but indicate both exist
+      const merged = {
+        ...highModel,
+        name: highModel.name.replace(/HIGH/gi, "").replace(/LOW/gi, "").trim(),
+        notes:
+          (highModel.notes || "") +
+          "\n\n[Variants: HIGH noise and LOW noise versions available]" +
+          (lowModel.notes ? "\n\nLOW variant notes: " + lowModel.notes : ""),
+        variants: {
+          high: variants.high,
+          low: variants.low,
+        },
+      };
+
+      models[basePath] = merged;
+    });
+
+    // Remove individual HIGH/LOW entries
+    toDelete.forEach((path) => delete models[path]);
+
+    if (Object.keys(toMerge).length > 0) {
+      console.log(
+        `✅ Merged ${Object.keys(toMerge).length} HIGH/LOW variant pairs`
+      );
+    }
   }
 
   processModels() {
@@ -202,13 +260,33 @@ class ModelExplorer {
       return;
     }
 
+    let visibleCount = 0;
     this.filteredModels.forEach((model) => {
       const card = this.createModelCard(model);
-      grid.appendChild(card);
+      if (card) {
+        // Only add if card is not null (rating filter)
+        grid.appendChild(card);
+        visibleCount++;
+      }
     });
+
+    // If content rating filtered everything out
+    if (visibleCount === 0) {
+      grid.innerHTML = `
+                <div class="welcome-screen">
+                    <h2>No models available at this rating</h2>
+                    <p>Try changing the content rating filter (🟢 PG → 🟡 R → 🔴 X)</p>
+                </div>
+            `;
+    }
   }
 
   createModelCard(model) {
+    // Check if model should be shown based on content rating
+    if (!this.canShowModel(model)) {
+      return null; // Hide card completely
+    }
+
     const card = document.createElement("div");
     card.className = "model-card";
 
@@ -216,36 +294,12 @@ class ModelExplorer {
       card.classList.add("selected");
     }
 
-    // NSFW filtering
-    if (model.nsfw && this.nsfwFilterEnabled) {
-      const hasSfwImage = model.exampleImages?.some((img) => img.isSfw);
-      if (!hasSfwImage) {
-        card.classList.add("nsfw-hidden");
-      }
-    }
-
-    // Get first image or placeholder
+    // Get appropriate image for current rating
+    const appropriateImage = this.getAppropriateImage(model);
     let imageHtml;
-    if (model.exampleImages && model.exampleImages.length > 0) {
-      let displayImage;
 
-      if (this.nsfwFilterEnabled && model.nsfw) {
-        // NSFW filter ON (locked) - prefer SFW images
-        displayImage =
-          model.exampleImages.find((img) => img.isSfw) ||
-          model.exampleImages[0];
-      } else {
-        // NSFW filter OFF (unlocked) - prefer NSFW images for NSFW models
-        if (model.nsfw) {
-          displayImage =
-            model.exampleImages.find((img) => !img.isSfw) ||
-            model.exampleImages[0];
-        } else {
-          displayImage = model.exampleImages[0];
-        }
-      }
-
-      imageHtml = `<img src="images/${displayImage.filename}" alt="${model.name}" class="model-image">`;
+    if (appropriateImage) {
+      imageHtml = `<img src="images/${appropriateImage.filename}" alt="${model.name}" class="model-image">`;
     } else {
       const icon = this.getModelTypeIcon(model.modelType);
       imageHtml = `<div class="model-placeholder">${icon}</div>`;
@@ -253,15 +307,14 @@ class ModelExplorer {
 
     card.innerHTML = `
             ${imageHtml}
-            ${model.nsfw ? '<div class="nsfw-badge">NSFW</div>' : ""}
             <div class="model-info">
                 <div class="model-header">
                     <div class="model-name">${this.escapeHtml(
                       model.name || "Unnamed Model"
                     )}</div>
-                    <div class="favorite-icon" onclick="event.stopPropagation(); app.toggleFavorite('${
+                    <div class="favorite-icon" onclick="event.stopPropagation(); app.toggleFavorite('${this.escapeAttribute(
                       model.path
-                    }')">
+                    )}')">
                         ${model.favorite ? "⭐" : "☆"}
                     </div>
                 </div>
@@ -480,22 +533,29 @@ class ModelExplorer {
                     </div>
                     <div class="image-gallery">
                         ${model.exampleImages
-                          .map((img) => {
-                            if (
-                              this.nsfwFilterEnabled &&
-                              model.nsfw &&
-                              !img.isSfw
-                            ) {
-                              return ""; // Skip NSFW images when filter is on
-                            }
-                            return `
-                                <div class="gallery-image">
-                                    <img src="images/${img.filename}" alt="${
-                              img.caption || model.name
-                            }">
-                                </div>
-                            `;
+                          .filter((img) => {
+                            const imgRating =
+                              img.rating || (model.nsfw ? "x" : "pg");
+                            return (
+                              this.getRatingValue(imgRating) <=
+                              this.getRatingValue(this.contentRating)
+                            );
                           })
+                          .map(
+                            (img) => `
+                            <div class="gallery-image" onclick="app.openLightbox('${
+                              img.filename
+                            }', '${this.escapeAttribute(
+                              img.caption || model.name
+                            )}')">
+                                <img src="images/${
+                                  img.filename
+                                }" alt="${this.escapeHtml(
+                              img.caption || model.name
+                            )}">
+                            </div>
+                        `
+                          )
                           .join("")}
                     </div>
                 </div>
@@ -788,17 +848,45 @@ class ModelExplorer {
     document.getElementById("editModal").style.display = "none";
   }
 
-  toggleFavorite(path) {
-    const model = this.modelData.models[path];
-    model.favorite = !model.favorite;
-    this.isDirty = true;
-    this.autoSave(); // Save immediately
-    this.applyFilters();
+  async toggleFavorite(path) {
+    try {
+      const response = await fetch(
+        `/api/models/${encodeURIComponent(path)}/favorite`,
+        {
+          method: "POST",
+        }
+      );
 
-    if (this.selectedModel?.path === path) {
-      this.selectedModel.favorite = model.favorite;
-      this.renderDetails(this.selectedModel);
+      if (response.ok) {
+        const result = await response.json();
+        const model = this.modelData.models[path];
+        model.favorite = result.favorite;
+        this.applyFilters();
+
+        if (this.selectedModel?.path === path) {
+          this.selectedModel.favorite = model.favorite;
+          this.renderDetails(this.selectedModel);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+      this.showToast("❌ Failed to update favorite");
     }
+  }
+
+  openLightbox(imagePath, caption) {
+    const lightbox = document.getElementById("imageLightbox");
+    const lightboxImg = document.getElementById("lightboxImg");
+    const lightboxCaption = document.getElementById("lightboxCaption");
+
+    lightboxImg.src = `images/${imagePath}`;
+    lightboxCaption.textContent = caption || "";
+    lightbox.style.display = "flex";
+  }
+
+  closeLightbox() {
+    const lightbox = document.getElementById("imageLightbox");
+    lightbox.style.display = "none";
   }
 
   toggleNsfwFilter() {
@@ -884,28 +972,127 @@ class ModelExplorer {
     console.log("✅ Exported modeldb.json");
   }
 
-  autoSave() {
-    if (!this.modelData) return;
+  async autoSave() {
+    if (!this.modelData || !this.serverMode) return;
 
     try {
-      localStorage.setItem("modeldb_autosave", JSON.stringify(this.modelData));
-      localStorage.setItem("modeldb_autosave_time", new Date().toISOString());
-      console.log("💾 Auto-saved to localStorage");
+      const response = await fetch("/api/models", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(this.modelData),
+      });
 
-      // Update visual indicator
-      const exportBtn = document.getElementById("exportJsonBtn");
-      if (this.isDirty) {
-        exportBtn.textContent = "💾 Export JSON *";
-        exportBtn.title = "You have unsaved changes";
+      if (response.ok) {
+        console.log("💾 Auto-saved to server");
+        this.isDirty = false;
+
+        // Update button
+        const exportBtn = document.getElementById("exportJsonBtn");
+        exportBtn.textContent = "💾 Export JSON";
+        exportBtn.title = "Export database to file";
+      } else {
+        console.warn("Auto-save failed:", response.statusText);
       }
     } catch (error) {
       console.warn("Auto-save failed:", error);
-      if (error.name === "QuotaExceededError") {
-        alert(
-          "Storage quota exceeded! Please export your JSON to save changes."
-        );
+      this.showToast("⚠️ Auto-save failed - check server connection");
+    }
+  }
+
+  cycleContentRating() {
+    const ratings = ["pg", "r", "x"];
+    const currentIndex = ratings.indexOf(this.contentRating);
+    this.contentRating = ratings[(currentIndex + 1) % ratings.length];
+
+    // Update button icon and text
+    const btn = document.getElementById("contentRatingToggle");
+    const icons = {
+      pg: "🟢",
+      r: "🟡",
+      x: "🔴",
+    };
+    const labels = {
+      pg: "PG",
+      r: "R",
+      x: "X",
+    };
+
+    btn.innerHTML = `${icons[this.contentRating]} ${
+      labels[this.contentRating]
+    }`;
+    btn.title = `Content Rating: ${labels[
+      this.contentRating
+    ].toUpperCase()} - Click to cycle`;
+
+    // Re-render to apply filter
+    if (this.modelData) {
+      this.renderModelGrid();
+      if (this.selectedModel) {
+        this.renderDetails(this.selectedModel);
       }
     }
+
+    console.log(`Content rating: ${this.contentRating.toUpperCase()}`);
+  }
+
+  getRatingValue(rating) {
+    const values = { pg: 0, r: 1, x: 2 };
+    return values[rating] || 0;
+  }
+
+  getModelMaxRating(model) {
+    // Determine the maximum rating needed to view this model
+    if (!model.exampleImages || model.exampleImages.length === 0) {
+      return model.nsfw ? "x" : "pg";
+    }
+
+    // Find the minimum rating that has an appropriate image
+    const hasAnyImage = model.exampleImages.length > 0;
+    const hasPgImage = model.exampleImages.some(
+      (img) => img.rating === "pg" || (!img.rating && !model.nsfw)
+    );
+    const hasRImage = model.exampleImages.some((img) => img.rating === "r");
+    const hasXImage = model.exampleImages.some(
+      (img) => img.rating === "x" || (img.rating === undefined && model.nsfw)
+    );
+
+    // Return the most restrictive rating that has an image
+    if (hasPgImage) return "pg";
+    if (hasRImage) return "r";
+    if (hasXImage) return "x";
+
+    return model.nsfw ? "x" : "pg";
+  }
+
+  canShowModel(model) {
+    const modelRating = this.getModelMaxRating(model);
+    const currentRatingValue = this.getRatingValue(this.contentRating);
+    const modelRatingValue = this.getRatingValue(modelRating);
+
+    return currentRatingValue >= modelRatingValue;
+  }
+
+  getAppropriateImage(model) {
+    if (!model.exampleImages || model.exampleImages.length === 0) {
+      return null;
+    }
+
+    const currentRatingValue = this.getRatingValue(this.contentRating);
+
+    // Find the best image for current rating
+    for (let rating of ["pg", "r", "x"]) {
+      if (this.getRatingValue(rating) <= currentRatingValue) {
+        const img = model.exampleImages.find((img) => {
+          const imgRating = img.rating || (model.nsfw ? "x" : "pg");
+          return imgRating === rating;
+        });
+        if (img) return img;
+      }
+    }
+
+    return model.exampleImages[0]; // Fallback
   }
 
   updateModelCount() {
@@ -944,83 +1131,19 @@ class ModelExplorer {
     div.textContent = text;
     return div.innerHTML;
   }
+
+  escapeAttribute(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/'/g, "&#39;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
 }
 
 // Initialize app
 const app = new ModelExplorer();
 
-// Auto-load modeldb.json on page load
-window.addEventListener("load", async () => {
-  // First, try to load from the same directory
-  try {
-    const response = await fetch("modeldb.json");
-    if (response.ok) {
-      const data = await response.json();
-      console.log("✅ Auto-loaded modeldb.json from root directory");
-
-      // Check if there's newer localStorage data
-      const autosave = localStorage.getItem("modeldb_autosave");
-      const autosaveTime = localStorage.getItem("modeldb_autosave_time");
-
-      if (autosave && autosaveTime) {
-        const minutes = Math.floor(
-          (Date.now() - new Date(autosaveTime)) / 60000
-        );
-        if (minutes < 60) {
-          if (
-            confirm(
-              `Found local edits from ${minutes} minutes ago. Load local edits instead of file?`
-            )
-          ) {
-            app.modelData = JSON.parse(autosave);
-            console.log("✅ Using local edits");
-          } else {
-            app.modelData = data;
-          }
-        } else {
-          app.modelData = data;
-        }
-      } else {
-        app.modelData = data;
-      }
-
-      app.processModels();
-      app.renderModelGrid();
-      app.updateModelCount();
-      document.getElementById("exportJsonBtn").disabled = false;
-      const welcomeScreen = document.getElementById("welcomeScreen");
-      if (welcomeScreen) welcomeScreen.remove();
-      return;
-    }
-  } catch (error) {
-    console.log("ℹ️ No modeldb.json in root, waiting for manual load");
-  }
-
-  // If no file found, check for localStorage backup
-  const autosave = localStorage.getItem("modeldb_autosave");
-  const autosaveTime = localStorage.getItem("modeldb_autosave_time");
-
-  if (autosave && autosaveTime) {
-    const minutes = Math.floor((Date.now() - new Date(autosaveTime)) / 60000);
-    if (minutes < 60) {
-      if (
-        confirm(
-          `No modeldb.json found. Restore from local backup (${minutes} minutes ago)?`
-        )
-      ) {
-        try {
-          app.modelData = JSON.parse(autosave);
-          app.processModels();
-          app.renderModelGrid();
-          app.updateModelCount();
-          document.getElementById("exportJsonBtn").disabled = false;
-          const welcomeScreen = document.getElementById("welcomeScreen");
-          if (welcomeScreen) welcomeScreen.remove();
-          console.log("✅ Restored from local backup");
-        } catch (error) {
-          console.error("Failed to restore backup:", error);
-        }
-      }
-    }
-  }
-});
+// App will auto-load from server in init()
+console.log("🎨 Model Explorer initialized in Flask server mode");

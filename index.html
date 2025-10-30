@@ -14,18 +14,16 @@
         <span class="model-count" id="modelCount">0 models</span>
       </div>
       <div class="header-right">
-        <input
-          type="file"
-          id="jsonFileInput"
-          accept=".json"
-          style="display: none"
-        />
-        <button class="btn btn-primary" id="loadJsonBtn">📁 Load JSON</button>
+        <button class="btn btn-primary" id="loadJsonBtn">🔄 Reload</button>
         <button class="btn btn-secondary" id="exportJsonBtn" disabled>
           💾 Export JSON
         </button>
-        <button class="btn btn-icon" id="nsfwToggle" title="Toggle NSFW filter">
-          <span id="nsfwIcon">🔒</span>
+        <button
+          class="btn btn-icon"
+          id="contentRatingToggle"
+          title="Content Rating: PG - Click to cycle"
+        >
+          🟢 PG
         </button>
       </div>
     </header>
@@ -65,7 +63,6 @@
               <option value="SDXL">SDXL</option>
               <option value="Flux">Flux</option>
               <option value="Pony">Pony</option>
-              <option value="Illustrious">Illustrious</option>
             </select>
           </div>
 
@@ -119,6 +116,13 @@
           <!-- Edit form will be injected here -->
         </div>
       </div>
+    </div>
+
+    <!-- Image Lightbox -->
+    <div class="lightbox-overlay" id="imageLightbox" style="display: none">
+      <button class="lightbox-close">✕</button>
+      <img id="lightboxImg" src="" alt="" />
+      <div class="lightbox-caption" id="lightboxCaption"></div>
     </div>
 
     <script src="app.js"></script>
