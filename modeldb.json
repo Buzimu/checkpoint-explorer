@@ -2208,17 +2208,33 @@
     "models/loras/WAN/nsfw/22-nsfw-HIGH-e6.safetensors": {
       "modelType": "lora",
       "fileHash": "C7580EC3B3B6133EA724C655AE70411B139261E3921DFE27F9799AD86C4B3A06",
-      "recommendedSettings": {},
+      "recommendedSettings": {
+        "resolution": "480 I2V"
+      },
       "tags": [],
       "name": "22-nsfw-HIGH-e6",
-      "triggerWords": [],
-      "civitaiUrl": "",
+      "triggerWords": [
+        "nsfwsks + \"you just want really descriptive prompting\""
+      ],
+      "civitaiUrl": "https://civitai.com/models/1307155/wan-22-experimental-wan-general-nsfw-model?modelVersionId=2073605",
       "favorite": false,
-      "notes": "",
-      "baseModel": "",
+      "notes": "I do recommend at least trying a couple seeds as well, some seeds will be bad.\n\nYou're not allowed to make NSFW using i2v unless the image has been generated with a1111 or Civitai and still has the metadata.\n\n.9lora",
+      "baseModel": "Wan Video 2.2 I2V-A14B",
       "examplePrompts": [],
-      "nsfw": false,
-      "fileType": "safetensors"
+      "nsfw": true,
+      "fileType": "safetensors",
+      "exampleImages": [
+        {
+          "filename": "C7580EC3-1.mp4",
+          "isSfw": true,
+          "caption": "Example output"
+        },
+        {
+          "filename": "C7580EC3-2.png",
+          "isSfw": false,
+          "caption": "Example output"
+        }
+      ]
     },
     "models/loras/WAN/nsfw/T2V - Bodyshots v2 - 14b.safetensors": {
       "modelType": "lora",
@@ -2539,10 +2555,10 @@
       "modelType": "upscaler",
       "fileHash": "94D368B633614958F84F335B129FD85ABD30200E8FBC575B859BA6762116222B",
       "recommendedSettings": {},
-      "tags": [],
+      "tags": ["upscaler", "skin detail"],
       "name": "1x-ITF-SkinDiffDetail-Lite-v1",
       "triggerWords": [],
-      "civitaiUrl": "",
+      "civitaiUrl": "https://huggingface.co/uwg/upscaler/tree/main/ESRGAN",
       "favorite": false,
       "notes": "",
       "baseModel": "",
