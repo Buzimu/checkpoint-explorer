@@ -7,6 +7,7 @@ class ModelExplorer {
     this.contentRating = "pg"; // pg, r, x
     this.isDirty = false;
     this.serverMode = true; // Flask server mode
+    this.showVideos = false; // Toggle for video support
 
     this.init();
   }
@@ -22,10 +23,15 @@ class ModelExplorer {
     });
 
     document
-      .getElementById("contentRatingToggle")
-      .addEventListener("click", () => {
-        this.cycleContentRating();
+      .getElementById("contentRatingSelect")
+      .addEventListener("change", (e) => {
+        this.contentRating = e.target.value;
+        this.applyContentRating();
       });
+
+    document.getElementById("videoToggle").addEventListener("click", () => {
+      this.toggleVideoMode();
+    });
 
     // Search and filter listeners
     document.getElementById("searchInput").addEventListener("input", () => {
@@ -81,6 +87,8 @@ class ModelExplorer {
     });
 
     // Auto-load from server
+    // Setup drag and drop
+    this.setupDragDrop();
     this.loadFromServer();
   }
 
@@ -289,24 +297,31 @@ class ModelExplorer {
 
     const card = document.createElement("div");
     card.className = "model-card";
+    card.dataset.modelPath = model.path;
 
     if (this.selectedModel?.path === model.path) {
       card.classList.add("selected");
     }
 
     // Get appropriate image for current rating
-    const appropriateImage = this.getAppropriateImage(model);
-    let imageHtml;
+    // Get appropriate media for current rating
+    const appropriateMedia = this.getAppropriateMedia(model);
+    let mediaHtml;
 
-    if (appropriateImage) {
-      imageHtml = `<img src="images/${appropriateImage.filename}" alt="${model.name}" class="model-image">`;
+    if (appropriateMedia) {
+      mediaHtml = this.renderMediaElement(appropriateMedia, model.name);
     } else {
       const icon = this.getModelTypeIcon(model.modelType);
-      imageHtml = `<div class="model-placeholder">${icon}</div>`;
+      mediaHtml = `<div class="model-placeholder">${icon}</div>`;
     }
 
+    // Add drop indicator for drag-drop
+    const dropIndicator = `<div class="drop-indicator">📁</div>`;
+    //${imageHtml}
     card.innerHTML = `
-            ${imageHtml}
+            
+            ${dropIndicator}
+            ${mediaHtml}
             <div class="model-info">
                 <div class="model-header">
                     <div class="model-name">${this.escapeHtml(
@@ -358,6 +373,21 @@ class ModelExplorer {
                         ${
                           model.civitaiUrl
                             ? `<a href="${model.civitaiUrl}" target="_blank" class="btn btn-secondary">🌐 CivitAI</a>`
+                            : ""
+                        }
+                        ${
+                          model.huggingFaceUrl
+                            ? `<a href="${model.huggingFaceUrl}" target="_blank" class="btn btn-secondary">🤗 HuggingFace</a>`
+                            : ""
+                        }
+                        ${
+                          model.githubUrl
+                            ? `<a href="${model.githubUrl}" target="_blank" class="btn btn-secondary">🐙 GitHub</a>`
+                            : ""
+                        }
+                        ${
+                          model.otherUrl
+                            ? `<a href="${model.otherUrl}" target="_blank" class="btn btn-secondary">🔗 Link</a>`
                             : ""
                         }
                     </div>
@@ -450,34 +480,7 @@ class ModelExplorer {
                 }
 
                 <!-- Recommended Settings -->
-                ${
-                  model.recommendedSettings &&
-                  Object.keys(model.recommendedSettings).length > 0
-                    ? `
-                <div class="section">
-                    <div class="section-header">
-                        <div class="section-title">⚙️ Recommended Settings</div>
-                    </div>
-                    <div class="info-grid">
-                        ${Object.entries(model.recommendedSettings)
-                          .map(
-                            ([key, value]) => `
-                            <div class="info-item">
-                                <span class="info-label">${this.formatKey(
-                                  key
-                                )}</span>
-                                <span class="info-value">${this.escapeHtml(
-                                  value
-                                )}</span>
-                            </div>
-                        `
-                          )
-                          .join("")}
-                    </div>
-                </div>
-                `
-                    : ""
-                }
+                ${this.renderRecommendedSettings(model)}
 
                 <!-- Notes -->
                 ${
@@ -548,11 +551,10 @@ class ModelExplorer {
                             }', '${this.escapeAttribute(
                               img.caption || model.name
                             )}')">
-                                <img src="images/${
-                                  img.filename
-                                }" alt="${this.escapeHtml(
-                              img.caption || model.name
-                            )}">
+                              ${this.renderMediaElement(
+                                img,
+                                img.caption || model.name
+                              )}
                             </div>
                         `
                           )
@@ -564,6 +566,54 @@ class ModelExplorer {
                 }
             </div>
         `;
+  }
+
+  renderRecommendedSettings(model) {
+    if (
+      !model.recommendedSettings ||
+      Object.keys(model.recommendedSettings).length === 0
+    ) {
+      return "";
+    }
+
+    // Define which fields are relevant for each model type
+    const fieldsByType = {
+      checkpoint: ["resolution", "sampler", "steps", "cfg", "clipSkip"],
+      lora: ["weight", "resolution", "steps", "cfg"],
+      controlnet: ["preprocessor", "weight", "guidanceStart", "guidanceEnd"],
+      upscaler: ["scale", "tileSize"],
+      vae: [], // VAE has no specific recommended settings typically
+      embedding: ["weight"],
+      hypernetwork: ["weight"],
+    };
+
+    const relevantFields = fieldsByType[model.modelType] || [];
+    if (relevantFields.length === 0) return "";
+
+    const settingsHtml = Object.entries(model.recommendedSettings)
+      .filter(([key]) => relevantFields.includes(key))
+      .map(
+        ([key, value]) => `
+      <div class="info-item">
+        <span class="info-label">${this.formatKey(key)}</span>
+        <span class="info-value">${this.escapeHtml(value)}</span>
+      </div>
+    `
+      )
+      .join("");
+
+    if (!settingsHtml) return "";
+
+    return `
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">⚙️ Recommended Settings</div>
+      </div>
+      <div class="info-grid">
+        ${settingsHtml}
+      </div>
+    </div>
+  `;
   }
 
   openEditModal() {
@@ -681,6 +731,26 @@ class ModelExplorer {
                       model.civitaiUrl || ""
                     }" placeholder="https://civitai.com/models/...">
                 </div>
+                <div class="form-group">
+                    <label class="form-label">HuggingFace URL</label>
+                    <input type="url" class="form-input" name="huggingFaceUrl" value="${
+                      model.huggingFaceUrl || ""
+                    }" placeholder="https://huggingface.co/...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">GitHub URL</label>
+                    <input type="url" class="form-input" name="githubUrl" value="${
+                      model.githubUrl || ""
+                    }" placeholder="https://github.com/...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Other URL</label>
+                    <input type="url" class="form-input" name="otherUrl" value="${
+                      model.otherUrl || ""
+                    }" placeholder="https://...">
+                </div>
 
                 <div class="form-group">
                     <label class="form-label">Notes</label>
@@ -691,21 +761,7 @@ class ModelExplorer {
 
                 <div class="form-group">
                     <label class="form-label">Recommended Settings</label>
-                    <input type="text" class="form-input" name="resolution" value="${
-                      model.recommendedSettings?.resolution || ""
-                    }" placeholder="Resolution (e.g., 512x768)">
-                    <input type="text" class="form-input" name="sampler" value="${
-                      model.recommendedSettings?.sampler || ""
-                    }" placeholder="Sampler" style="margin-top: 8px;">
-                    <input type="text" class="form-input" name="steps" value="${
-                      model.recommendedSettings?.steps || ""
-                    }" placeholder="Steps" style="margin-top: 8px;">
-                    <input type="text" class="form-input" name="cfg" value="${
-                      model.recommendedSettings?.cfg || ""
-                    }" placeholder="CFG Scale" style="margin-top: 8px;">
-                    <input type="text" class="form-input" name="clipSkip" value="${
-                      model.recommendedSettings?.clipSkip || ""
-                    }" placeholder="Clip Skip" style="margin-top: 8px;">
+                    ${this.renderSettingsInputs(model)}
                 </div>
 
                 <div class="form-group">
@@ -761,6 +817,9 @@ class ModelExplorer {
     model.nsfw = formData.get("nsfw") === "on";
     model.favorite = formData.get("favorite") === "on";
     model.civitaiUrl = formData.get("civitaiUrl");
+    model.huggingFaceUrl = formData.get("huggingFaceUrl");
+    model.githubUrl = formData.get("githubUrl");
+    model.otherUrl = formData.get("otherUrl");
     model.notes = formData.get("notes");
 
     // Parse tags
@@ -781,16 +840,27 @@ class ModelExplorer {
           .filter((t) => t)
       : [];
 
-    // Update recommended settings
-    model.recommendedSettings = {
-      ...(formData.get("resolution") && {
-        resolution: formData.get("resolution"),
-      }),
-      ...(formData.get("sampler") && { sampler: formData.get("sampler") }),
-      ...(formData.get("steps") && { steps: formData.get("steps") }),
-      ...(formData.get("cfg") && { cfg: formData.get("cfg") }),
-      ...(formData.get("clipSkip") && { clipSkip: formData.get("clipSkip") }),
+    // Update recommended settings (only save non-empty values)
+    const fieldsByType = {
+      checkpoint: ["resolution", "sampler", "steps", "cfg", "clipSkip"],
+      lora: ["weight", "resolution", "steps", "cfg"],
+      controlnet: ["preprocessor", "weight", "guidanceStart", "guidanceEnd"],
+      upscaler: ["scale", "tileSize"],
+      vae: [],
+      embedding: ["weight"],
+      hypernetwork: ["weight"],
     };
+
+    const relevantFields =
+      fieldsByType[model.modelType] || fieldsByType.checkpoint;
+    model.recommendedSettings = {};
+
+    relevantFields.forEach((field) => {
+      const value = formData.get(field);
+      if (value && value.trim()) {
+        model.recommendedSettings[field] = value.trim();
+      }
+    });
 
     // Update example prompts
     const promptEditors = document.querySelectorAll(".prompt-editor");
@@ -1001,31 +1071,7 @@ class ModelExplorer {
     }
   }
 
-  cycleContentRating() {
-    const ratings = ["pg", "r", "x"];
-    const currentIndex = ratings.indexOf(this.contentRating);
-    this.contentRating = ratings[(currentIndex + 1) % ratings.length];
-
-    // Update button icon and text
-    const btn = document.getElementById("contentRatingToggle");
-    const icons = {
-      pg: "🟢",
-      r: "🟡",
-      x: "🔴",
-    };
-    const labels = {
-      pg: "PG",
-      r: "R",
-      x: "X",
-    };
-
-    btn.innerHTML = `${icons[this.contentRating]} ${
-      labels[this.contentRating]
-    }`;
-    btn.title = `Content Rating: ${labels[
-      this.contentRating
-    ].toUpperCase()} - Click to cycle`;
-
+  applyContentRating() {
     // Re-render to apply filter
     if (this.modelData) {
       this.renderModelGrid();
@@ -1033,8 +1079,25 @@ class ModelExplorer {
         this.renderDetails(this.selectedModel);
       }
     }
-
     console.log(`Content rating: ${this.contentRating.toUpperCase()}`);
+  }
+
+  toggleVideoMode() {
+    this.showVideos = !this.showVideos;
+    const btn = document.getElementById("videoToggle");
+    btn.innerHTML = this.showVideos ? "🎬 Videos" : "🖼️ Images";
+    btn.title = this.showVideos
+      ? "Showing videos (click for images only)"
+      : "Showing images only (click to include videos)";
+
+    // Re-render to apply changes
+    if (this.modelData) {
+      this.renderModelGrid();
+      if (this.selectedModel) {
+        this.renderDetails(this.selectedModel);
+      }
+    }
+    console.log(`Video mode: ${this.showVideos ? "ON" : "OFF"}`);
   }
 
   getRatingValue(rating) {
@@ -1074,25 +1137,105 @@ class ModelExplorer {
     return currentRatingValue >= modelRatingValue;
   }
 
-  getAppropriateImage(model) {
+  getAppropriateMedia(model) {
     if (!model.exampleImages || model.exampleImages.length === 0) {
       return null;
     }
 
     const currentRatingValue = this.getRatingValue(this.contentRating);
 
-    // Find the best image for current rating
-    for (let rating of ["pg", "r", "x"]) {
-      if (this.getRatingValue(rating) <= currentRatingValue) {
-        const img = model.exampleImages.find((img) => {
-          const imgRating = img.rating || (model.nsfw ? "x" : "pg");
-          return imgRating === rating;
-        });
-        if (img) return img;
-      }
+    // Filter by rating first
+    const appropriateMedia = model.exampleImages.filter((item) => {
+      const itemRating = item.rating || (model.nsfw ? "x" : "pg");
+      return this.getRatingValue(itemRating) <= currentRatingValue;
+    });
+
+    if (appropriateMedia.length === 0) return null;
+
+    // If videos disabled, filter out videos
+    if (!this.showVideos) {
+      const imagesOnly = appropriateMedia.filter((item) => {
+        const ext = (item.filename || "").toLowerCase();
+        return !ext.endsWith(".mp4") && !ext.endsWith(".webm");
+      });
+      return imagesOnly[0] || appropriateMedia[0]; // Fallback to first if no images
     }
 
-    return model.exampleImages[0]; // Fallback
+    return appropriateMedia[0];
+  }
+
+  renderMediaElement(media, altText) {
+    const ext = (media.filename || "").toLowerCase();
+    const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
+
+    if (isVideo && this.showVideos) {
+      return `
+      <video class="model-media" autoplay loop muted playsinline>
+        <source src="images/${media.filename}" type="video/${ext.replace(
+        ".",
+        ""
+      )}">
+        <div class="model-placeholder">🎬</div>
+      </video>
+    `;
+    } else if (isVideo && !this.showVideos) {
+      // Video exists but videos are disabled - show placeholder
+      return `<div class="model-placeholder">🎬</div>`;
+    } else {
+      return `<img src="images/${media.filename}" alt="${altText}" class="model-media">`;
+    }
+  }
+
+  renderSettingsInputs(model) {
+    const settings = model.recommendedSettings || {};
+    const modelType = model.modelType || "checkpoint";
+
+    // Define fields per model type
+    const fieldDefinitions = {
+      checkpoint: [
+        { key: "resolution", placeholder: "Resolution (e.g., 512x768)" },
+        { key: "sampler", placeholder: "Sampler" },
+        { key: "steps", placeholder: "Steps" },
+        { key: "cfg", placeholder: "CFG Scale" },
+        { key: "clipSkip", placeholder: "Clip Skip" },
+      ],
+      lora: [
+        { key: "weight", placeholder: "Weight (e.g., 0.7)" },
+        { key: "resolution", placeholder: "Resolution (e.g., 512x768)" },
+        { key: "steps", placeholder: "Steps" },
+        { key: "cfg", placeholder: "CFG Scale" },
+      ],
+      controlnet: [
+        { key: "preprocessor", placeholder: "Preprocessor" },
+        { key: "weight", placeholder: "Weight (e.g., 0.8)" },
+        { key: "guidanceStart", placeholder: "Guidance Start (e.g., 0.0)" },
+        { key: "guidanceEnd", placeholder: "Guidance End (e.g., 1.0)" },
+      ],
+      upscaler: [
+        { key: "scale", placeholder: "Scale (e.g., 4x)" },
+        { key: "tileSize", placeholder: "Tile Size" },
+      ],
+      vae: [],
+      embedding: [{ key: "weight", placeholder: "Weight (e.g., 1.0)" }],
+      hypernetwork: [{ key: "weight", placeholder: "Weight (e.g., 0.8)" }],
+    };
+
+    const fields = fieldDefinitions[modelType] || fieldDefinitions.checkpoint;
+
+    return fields
+      .map(
+        (field, idx) => `
+    <input 
+      type="text" 
+      class="form-input" 
+      name="${field.key}" 
+      value="${settings[field.key] || ""}" 
+      placeholder="${field.placeholder}"
+      ${idx > 0 ? 'style="margin-top: 8px;"' : ""}
+    >
+  `
+      )
+      .join("");
   }
 
   updateModelCount() {
@@ -1139,6 +1282,165 @@ class ModelExplorer {
       .replace(/"/g, "&quot;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
+  }
+
+  setupDragDrop() {
+    const grid = document.getElementById("modelGrid");
+
+    // Prevent default drag behaviors
+    ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+      grid.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+
+    // Add drag-over visual feedback
+    grid.addEventListener("dragover", (e) => {
+      const card = e.target.closest(".model-card");
+      if (card) {
+        card.classList.add("drag-over");
+      }
+    });
+
+    grid.addEventListener("dragleave", (e) => {
+      const card = e.target.closest(".model-card");
+      if (card && !card.contains(e.relatedTarget)) {
+        card.classList.remove("drag-over");
+      }
+    });
+
+    // Handle file drop
+    grid.addEventListener("drop", async (e) => {
+      // Remove drag-over class from all cards
+      document.querySelectorAll(".model-card.drag-over").forEach((card) => {
+        card.classList.remove("drag-over");
+      });
+
+      const files = e.dataTransfer.files;
+      if (files.length === 0) return;
+
+      const file = files[0];
+      const validExts = [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".mp4",
+        ".webm",
+      ];
+      const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0];
+
+      if (!validExts.includes(ext)) {
+        this.showToast("❌ Invalid file type. Use images or videos.");
+        return;
+      }
+
+      // Find which card was dropped on
+      const card = e.target.closest(".model-card");
+      if (!card) {
+        this.showToast("❌ Drop file on a model card");
+        return;
+      }
+
+      const modelPath = card.dataset.modelPath;
+      if (!modelPath) return;
+
+      await this.handleMediaDrop(file, modelPath);
+    });
+  }
+
+  async handleMediaDrop(file, modelPath) {
+    try {
+      this.showToast("⏳ Uploading...");
+
+      // Upload file to server
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("modelPath", modelPath);
+
+      const response = await fetch("/api/upload-media", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Upload failed");
+
+      const result = await response.json();
+
+      // Show rating dialog
+      const rating = await this.promptForRating();
+      if (!rating) {
+        this.showToast("❌ Upload cancelled");
+        return;
+      }
+
+      // Update model with new media
+      const updateResponse = await fetch(
+        `/api/models/${encodeURIComponent(modelPath)}/add-media`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: result.filename,
+            rating: rating,
+            caption: "",
+          }),
+        }
+      );
+
+      if (updateResponse.ok) {
+        this.showToast("✅ Media added successfully!");
+        await this.loadFromServer(); // Reload data
+
+        // Re-select the model if it was selected
+        if (this.selectedModel?.path === modelPath) {
+          this.selectedModel = this.modelData.models[modelPath];
+          this.renderDetails(this.selectedModel);
+        }
+      }
+    } catch (error) {
+      console.error("Media upload failed:", error);
+      this.showToast("❌ Failed to upload media");
+    }
+  }
+
+  async promptForRating() {
+    return new Promise((resolve) => {
+      const dialog = document.createElement("div");
+      dialog.className = "rating-dialog-overlay";
+      dialog.innerHTML = `
+      <div class="rating-dialog">
+        <h3>Assign Content Rating</h3>
+        <p style="color: #6272a4; margin-bottom: 20px; font-size: 14px;">
+          Choose the content rating for this image/video
+        </p>
+        <div class="rating-options">
+          <button class="rating-btn" data-rating="pg">🟢 PG</button>
+          <button class="rating-btn" data-rating="r">🟡 R</button>
+          <button class="rating-btn" data-rating="x">🔴 X</button>
+        </div>
+        <button class="btn-cancel">Cancel</button>
+      </div>
+    `;
+
+      document.body.appendChild(dialog);
+
+      dialog.addEventListener("click", (e) => {
+        if (e.target.classList.contains("rating-btn")) {
+          const rating = e.target.dataset.rating;
+          dialog.remove();
+          resolve(rating);
+        } else if (
+          e.target.classList.contains("btn-cancel") ||
+          e.target === dialog
+        ) {
+          dialog.remove();
+          resolve(null);
+        }
+      });
+    });
   }
 }
 

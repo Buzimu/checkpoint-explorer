@@ -229,7 +229,7 @@ body {
     box-shadow: 0 0 0 3px rgba(255, 121, 198, 0.2);
 }
 
-.model-image {
+.model-media {
     width: 100%;
     height: 280px;
     object-fit: cover;
@@ -844,8 +844,135 @@ body {
         padding: 16px;
     }
     
-    .model-image,
+    .model-media,
     .model-placeholder {
         height: 200px;
     }
+}
+/* Rating Dropdown */
+.rating-select {
+  padding: 10px 16px;
+  background: rgba(68, 71, 90, 0.7);
+  border: 1px solid #6272a4;
+  border-radius: 8px;
+  color: #f8f8f2;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rating-select:hover {
+  border-color: #bd93f9;
+}
+
+.rating-select:focus {
+  outline: none;
+  border-color: #ff79c6;
+  box-shadow: 0 0 0 3px rgba(255, 121, 198, 0.2);
+}
+
+/* Update model-image to model-media for video support */
+.model-media {
+  width: 100%;
+  height: 280px;
+  object-fit: cover;
+  background: rgba(68, 71, 90, 0.3);
+  display: block;
+}
+
+/* Rating Dialog */
+.rating-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+
+.rating-dialog {
+  background: #282a36;
+  border: 2px solid #44475a;
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  min-width: 300px;
+}
+
+.rating-dialog h3 {
+  margin-bottom: 24px;
+  color: #f8f8f2;
+  font-size: 20px;
+}
+
+.rating-options {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  justify-content: center;
+}
+
+.rating-btn {
+  padding: 16px 24px;
+  background: rgba(68, 71, 90, 0.5);
+  border: 2px solid #6272a4;
+  border-radius: 8px;
+  color: #f8f8f2;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rating-btn:hover {
+  transform: translateY(-2px);
+  border-color: #bd93f9;
+}
+
+.btn-cancel {
+  padding: 10px 24px;
+  background: rgba(255, 85, 85, 0.2);
+  color: #ff5555;
+  border: 1px solid #ff5555;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel:hover {
+  background: #ff5555;
+  color: white;
+}
+
+/* Drag and Drop */
+.model-card.drag-over {
+  border-color: #50fa7b !important;
+  box-shadow: 0 0 20px rgba(80, 250, 123, 0.5) !important;
+  transform: scale(1.02);
+}
+
+.model-card .drop-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(80, 250, 123, 0.1);
+  border: 3px dashed #50fa7b;
+  border-radius: 10px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.model-card.drag-over .drop-indicator {
+  display: flex;
 }

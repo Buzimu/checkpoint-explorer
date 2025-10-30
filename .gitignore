@@ -1,6 +1,7 @@
 # ComfyUI Model Explorer - Git Ignore File
 images/
-modeldb.json
+*.json
+*.backup.*
 
 # Python
 __pycache__/

@@ -18,12 +18,25 @@
         <button class="btn btn-secondary" id="exportJsonBtn" disabled>
           💾 Export JSON
         </button>
+
+        <!-- Content Rating Dropdown -->
+        <select
+          class="rating-select"
+          id="contentRatingSelect"
+          title="Content Rating Filter"
+        >
+          <option value="pg">🟢 PG</option>
+          <option value="r">🟡 R</option>
+          <option value="x">🔴 X</option>
+        </select>
+
+        <!-- Video Toggle Button -->
         <button
           class="btn btn-icon"
-          id="contentRatingToggle"
-          title="Content Rating: PG - Click to cycle"
+          id="videoToggle"
+          title="Showing images only (click to include videos)"
         >
-          🟢 PG
+          🖼️ Images
         </button>
       </div>
     </header>

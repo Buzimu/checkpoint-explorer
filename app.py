@@ -47,16 +47,16 @@ def save_db(data):
                 backup_data = f.read()
             with open(backup_file, 'w', encoding='utf-8') as f:
                 f.write(backup_data)
-            print(f"✅ Created backup: {backup_file}")
+            print(f"âœ… Created backup: {backup_file}")
         
         # Save new data
         with open(DB_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         
-        print(f"✅ Saved database: {len(data.get('models', {}))} models")
+        print(f"âœ… Saved database: {len(data.get('models', {}))} models")
         return True
     except Exception as e:
-        print(f"❌ Error saving database: {e}")
+        print(f"âŒ Error saving database: {e}")
         return False
 
 # Serve frontend files
@@ -125,8 +125,81 @@ def toggle_favorite(model_path):
 
 @app.route('/images/<path:filename>')
 def serve_image(filename):
-    """Serve example images"""
+    """Serve example images and videos"""
     return send_from_directory(IMAGES_DIR, filename)
+
+@app.route('/api/upload-media', methods=['POST'])
+def upload_media():
+    """Upload image or video for a model"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        model_path = request.form.get('modelPath')
+        
+        if not file.filename:
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        # Validate file extension
+        allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm'}
+        ext = os.path.splitext(file.filename)[1].lower()
+        
+        if ext not in allowed_extensions:
+            return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+        
+        # Generate hash-based filename
+        import hashlib
+        file_content = file.read()
+        file_hash = hashlib.sha256(file_content).hexdigest()[:16]
+        filename = f"{file_hash}{ext}"
+        
+        # Save file
+        file_path = os.path.join(IMAGES_DIR, filename)
+        with open(file_path, 'wb') as f:
+            f.write(file_content)
+        
+        print(f"✅ Uploaded media: {filename} for model: {model_path}")
+        return jsonify({'success': True, 'filename': filename})
+        
+    except Exception as e:
+        print(f"❌ Upload failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/models/<path:model_path>/add-media', methods=['POST'])
+def add_media_to_model(model_path):
+    """Add uploaded media to model's exampleImages"""
+    try:
+        db = load_db()
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        data = request.json
+        filename = data.get('filename')
+        rating = data.get('rating', 'pg')
+        caption = data.get('caption', '')
+        
+        # Add to exampleImages
+        if 'exampleImages' not in db['models'][model_path]:
+            db['models'][model_path]['exampleImages'] = []
+        
+        db['models'][model_path]['exampleImages'].append({
+            'filename': filename,
+            'rating': rating,
+            'caption': caption
+        })
+        
+        if save_db(db):
+            print(f"✅ Added media {filename} to model {model_path}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save'}), 500
+            
+    except Exception as e:
+        print(f"❌ Add media failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/scan', methods=['POST'])
 def trigger_scan():
@@ -181,7 +254,7 @@ if __name__ == '__main__':
     # Check if database exists
     if os.path.exists(DB_FILE):
         db = load_db()
-        print(f"✅ Database loaded: {len(db.get('models', {}))} models")
+        print(f"✅ Database loaded: {len(db.get('models', {}))} models")%
     else:
         print("⚠️  No database file found - will create on first save")
     
