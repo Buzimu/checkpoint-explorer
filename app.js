@@ -1294,14 +1294,21 @@ class ModelExplorer {
   }
 
   canShowModel(model) {
-    if (!model.exampleImages || model.exampleImages.length === 0) {
-      return true; // Always show if no images
-    }
-
     const currentRatingValue = this.getRatingValue(this.contentRating);
 
+    // If model has no images
+    if (!model.exampleImages || model.exampleImages.length === 0) {
+      // NSFW models without images only show at X rating
+      if (model.nsfw) {
+        return currentRatingValue >= this.getRatingValue("x");
+      }
+      return true; // Non-NSFW models with no images always show
+    }
+
+    // Model has images - check if any are appropriate for current rating
     const hasAppropriateImage = model.exampleImages.some((img) => {
-      const imgRating = img.rating || "pg";
+      // DEFAULT RATING: If image has no rating, use X for NSFW models, PG for others
+      const imgRating = img.rating || (model.nsfw ? "x" : "pg");
       return this.getRatingValue(imgRating) <= currentRatingValue;
     });
 
@@ -1383,8 +1390,9 @@ class ModelExplorer {
   }
 
   renderMediaElement(media, altText) {
-    const ext = (media.filename || "").toLowerCase();
-    const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
+    const filename = media.filename || "";
+    const ext = filename.toLowerCase().split(".").pop();
+    const isVideo = ext === "mp4" || ext === "webm";
 
     if (isVideo && this.showVideos) {
       return `
