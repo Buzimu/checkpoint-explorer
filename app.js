@@ -290,10 +290,15 @@ class ModelExplorer {
   }
 
   createModelCard(model) {
+    console.log("\n🎴 === createModelCard CALLED ===");
+    console.log("Model:", model.name);
+
     // Check if model should be shown based on content rating
     if (!this.canShowModel(model)) {
-      return null; // Hide card completely
+      console.log("  ❌ Model hidden by canShowModel()");
+      return null;
     }
+    console.log("  ✅ Model passed canShowModel()");
 
     const card = document.createElement("div");
     card.className = "model-card";
@@ -303,9 +308,25 @@ class ModelExplorer {
       card.classList.add("selected");
     }
 
-    // Get appropriate image for current rating
     // Get appropriate media for current rating
+    console.log("  Calling getAppropriateMedia()...");
     const appropriateMedia = this.getAppropriateMedia(model);
+
+    // Check if model should be shown based on content rating
+    //if (!this.canShowModel(model)) {
+    //  return null; // Hide card completely
+    // }
+
+    // const card = document.createElement("div");
+    // card.className = "model-card";
+    // card.dataset.modelPath = model.path;
+
+    //if (this.selectedModel?.path === model.path) {
+    //   card.classList.add("selected");
+    //}
+
+    // Get appropriate media for current rating
+    // const appropriateMedia = this.getAppropriateMedia(model);
     let mediaHtml;
 
     if (appropriateMedia) {
@@ -944,13 +965,77 @@ class ModelExplorer {
     }
   }
 
-  openLightbox(imagePath, caption) {
+  openLightbox(imagePath, caption, modelPath) {
     const lightbox = document.getElementById("imageLightbox");
-    const lightboxImg = document.getElementById("lightboxImg");
+    const lightboxContent = document.getElementById("lightboxContent");
     const lightboxCaption = document.getElementById("lightboxCaption");
+    const lightboxControls = document.getElementById("lightboxControls");
 
-    lightboxImg.src = `images/${imagePath}`;
+    // Find the media item and model
+    let model = this.selectedModel;
+    if (modelPath) {
+      model = this.modelData.models[modelPath];
+    }
+
+    if (!model || !model.exampleImages) {
+      console.error("Model or images not found");
+      return;
+    }
+
+    const mediaItem = model.exampleImages.find(
+      (img) => img.filename === imagePath
+    );
+
+    if (!mediaItem) {
+      console.error("Media item not found:", imagePath);
+      return;
+    }
+
+    // Render media (image or video)
+    const ext = imagePath.toLowerCase();
+    const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
+
+    if (isVideo) {
+      lightboxContent.innerHTML = `
+      <video id="lightboxMedia" autoplay loop muted controls style="max-width: 90%; max-height: 90vh; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
+        <source src="images/${imagePath}" type="video/${ext.split(".").pop()}">
+      </video>
+    `;
+    } else {
+      lightboxContent.innerHTML = `
+      <img id="lightboxMedia" src="images/${imagePath}" alt="${this.escapeHtml(
+        caption || ""
+      )}" style="max-width: 90%; max-height: 90vh; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
+    `;
+    }
+
     lightboxCaption.textContent = caption || "";
+
+    // Add rating controls
+    const currentRating = mediaItem.rating || (model.nsfw ? "x" : "pg");
+    lightboxControls.innerHTML = `
+    <div class="lightbox-rating-controls">
+      <label style="color: #6272a4; font-size: 14px; margin-right: 12px;">Rating:</label>
+      <select class="lightbox-rating-select" id="lightboxRatingSelect">
+        <option value="pg" ${
+          currentRating === "pg" ? "selected" : ""
+        }>🟢 PG</option>
+        <option value="r" ${
+          currentRating === "r" ? "selected" : ""
+        }>🟡 R</option>
+        <option value="x" ${
+          currentRating === "x" ? "selected" : ""
+        }>🔴 X</option>
+      </select>
+      <button class="btn-lightbox-save" onclick="app.saveLightboxRating('${this.escapeAttribute(
+        imagePath
+      )}', '${this.escapeAttribute(model.path)}')">💾 Save</button>
+      <button class="btn-lightbox-delete" onclick="app.deleteLightboxMedia('${this.escapeAttribute(
+        imagePath
+      )}', '${this.escapeAttribute(model.path)}')">🗑️ Delete</button>
+    </div>
+  `;
+
     lightbox.style.display = "flex";
   }
 
@@ -1072,14 +1157,22 @@ class ModelExplorer {
   }
 
   applyContentRating() {
-    // Re-render to apply filter
+    console.log("\n🔄 === applyContentRating CALLED ===");
+    console.log("New rating:", this.contentRating);
+
     if (this.modelData) {
-      this.renderModelGrid();
+      console.log("Calling processModels()...");
+      this.processModels();
+
+      console.log("Calling applyFilters()...");
+      this.applyFilters();
+
       if (this.selectedModel) {
+        console.log("Re-rendering details for:", this.selectedModel.name);
         this.renderDetails(this.selectedModel);
       }
     }
-    console.log(`Content rating: ${this.contentRating.toUpperCase()}`);
+    console.log("=== applyContentRating DONE ===\n");
   }
 
   toggleVideoMode() {
@@ -1092,7 +1185,8 @@ class ModelExplorer {
 
     // Re-render to apply changes
     if (this.modelData) {
-      this.renderModelGrid();
+      this.processModels();
+      this.applyFilters();
       if (this.selectedModel) {
         this.renderDetails(this.selectedModel);
       }
@@ -1106,60 +1200,108 @@ class ModelExplorer {
   }
 
   getModelMaxRating(model) {
-    // Determine the maximum rating needed to view this model
     if (!model.exampleImages || model.exampleImages.length === 0) {
-      return model.nsfw ? "x" : "pg";
+      return "pg";
     }
 
-    // Find the minimum rating that has an appropriate image
-    const hasAnyImage = model.exampleImages.length > 0;
-    const hasPgImage = model.exampleImages.some(
-      (img) => img.rating === "pg" || (!img.rating && !model.nsfw)
-    );
+    const hasPgImage = model.exampleImages.some((img) => {
+      const rating = img.rating || "pg";
+      return rating === "pg";
+    });
     const hasRImage = model.exampleImages.some((img) => img.rating === "r");
-    const hasXImage = model.exampleImages.some(
-      (img) => img.rating === "x" || (img.rating === undefined && model.nsfw)
-    );
+    const hasXImage = model.exampleImages.some((img) => img.rating === "x");
 
-    // Return the most restrictive rating that has an image
     if (hasPgImage) return "pg";
     if (hasRImage) return "r";
     if (hasXImage) return "x";
-
-    return model.nsfw ? "x" : "pg";
+    return "pg";
   }
 
   canShowModel(model) {
-    const modelRating = this.getModelMaxRating(model);
-    const currentRatingValue = this.getRatingValue(this.contentRating);
-    const modelRatingValue = this.getRatingValue(modelRating);
-
-    return currentRatingValue >= modelRatingValue;
-  }
-
-  getAppropriateMedia(model) {
     if (!model.exampleImages || model.exampleImages.length === 0) {
-      return null;
+      return true; // Always show if no images
     }
 
     const currentRatingValue = this.getRatingValue(this.contentRating);
 
-    // Filter by rating first
-    const appropriateMedia = model.exampleImages.filter((item) => {
-      const itemRating = item.rating || (model.nsfw ? "x" : "pg");
-      return this.getRatingValue(itemRating) <= currentRatingValue;
+    const hasAppropriateImage = model.exampleImages.some((img) => {
+      const imgRating = img.rating || "pg";
+      return this.getRatingValue(imgRating) <= currentRatingValue;
     });
 
-    if (appropriateMedia.length === 0) return null;
+    return hasAppropriateImage;
+  }
+
+  getAppropriateMedia(model) {
+    console.log("=== getAppropriateMedia CALLED ===");
+    console.log("Model name:", model.name);
+    console.log("Current content rating:", this.contentRating);
+    console.log("Show videos:", this.showVideos);
+
+    if (!model.exampleImages || model.exampleImages.length === 0) {
+      console.log("  ❌ No images found");
+      return null;
+    }
+
+    console.log("Total images:", model.exampleImages.length);
+    model.exampleImages.forEach((img, i) => {
+      console.log(
+        `  Image ${i}:`,
+        img.filename,
+        "Rating:",
+        img.rating || "NONE"
+      );
+    });
+
+    const currentRatingValue = this.getRatingValue(this.contentRating);
+    console.log("Current rating value:", currentRatingValue);
+
+    // Filter by rating first
+    let appropriateMedia = model.exampleImages.filter((item) => {
+      const itemRating = item.rating || "pg";
+      const passes = this.getRatingValue(itemRating) <= currentRatingValue;
+      console.log(
+        `  Check ${item.filename}: rating=${itemRating}, passes=${passes}`
+      );
+      return passes;
+    });
+
+    console.log("After rating filter:", appropriateMedia.length, "images");
+
+    if (appropriateMedia.length === 0) {
+      console.log("  ❌ No appropriate media found");
+      return null;
+    }
 
     // If videos disabled, filter out videos
     if (!this.showVideos) {
       const imagesOnly = appropriateMedia.filter((item) => {
         const ext = (item.filename || "").toLowerCase();
-        return !ext.endsWith(".mp4") && !ext.endsWith(".webm");
+        const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
+        console.log(`    ${item.filename} is video: ${isVideo}`);
+        return !isVideo;
       });
-      return imagesOnly[0] || appropriateMedia[0]; // Fallback to first if no images
+      appropriateMedia = imagesOnly.length > 0 ? imagesOnly : appropriateMedia;
+      console.log("After video filter:", appropriateMedia.length, "images");
     }
+
+    // Sort by rating value (highest first)
+    appropriateMedia.sort((a, b) => {
+      const ratingA = a.rating || "pg";
+      const ratingB = b.rating || "pg";
+      const valA = this.getRatingValue(ratingA);
+      const valB = this.getRatingValue(ratingB);
+      console.log(`  Sort: ${a.filename}(${valA}) vs ${b.filename}(${valB})`);
+      return valB - valA;
+    });
+
+    console.log(
+      "✅ Selected media:",
+      appropriateMedia[0]?.filename,
+      "Rating:",
+      appropriateMedia[0]?.rating
+    );
+    console.log("=== END getAppropriateMedia ===\n");
 
     return appropriateMedia[0];
   }

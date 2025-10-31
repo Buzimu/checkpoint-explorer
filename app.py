@@ -201,6 +201,82 @@ def add_media_to_model(model_path):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/models/<path:model_path>/update-media-rating', methods=['POST'])
+def update_media_rating(model_path):
+    """Update rating for a specific media item"""
+    try:
+        db = load_db()
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        data = request.json
+        filename = data.get('filename')
+        new_rating = data.get('rating')
+        
+        if not filename or not new_rating:
+            return jsonify({'success': False, 'error': 'Missing parameters'}), 400
+        
+        # Find and update the media item
+        media_list = db['models'][model_path].get('exampleImages', [])
+        updated = False
+        
+        for media in media_list:
+            if media['filename'] == filename:
+                media['rating'] = new_rating
+                updated = True
+                break
+        
+        if not updated:
+            return jsonify({'success': False, 'error': 'Media not found'}), 404
+        
+        if save_db(db):
+            print(f"✅ Updated rating for {filename} to {new_rating}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save'}), 500
+            
+    except Exception as e:
+        print(f"❌ Update rating failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/models/<path:model_path>/delete-media', methods=['POST'])
+def delete_media(model_path):
+    """Delete a media item from model's exampleImages"""
+    try:
+        db = load_db()
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        data = request.json
+        filename = data.get('filename')
+        
+        if not filename:
+            return jsonify({'success': False, 'error': 'Missing filename'}), 400
+        
+        # Remove from exampleImages
+        media_list = db['models'][model_path].get('exampleImages', [])
+        original_length = len(media_list)
+        
+        db['models'][model_path]['exampleImages'] = [
+            media for media in media_list 
+            if media['filename'] != filename
+        ]
+        
+        if len(db['models'][model_path]['exampleImages']) == original_length:
+            return jsonify({'success': False, 'error': 'Media not found'}), 404
+        
+        if save_db(db):
+            print(f"✅ Deleted media {filename} from model {model_path}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save'}), 500
+            
+    except Exception as e:
+        print(f"❌ Delete media failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/scan', methods=['POST'])
 def trigger_scan():
     """Trigger PowerShell script to scan for new models"""
@@ -254,7 +330,7 @@ if __name__ == '__main__':
     # Check if database exists
     if os.path.exists(DB_FILE):
         db = load_db()
-        print(f"✅ Database loaded: {len(db.get('models', {}))} models")%
+        print(f"✅ Database loaded: {len(db.get('models', {}))} models")
     else:
         print("⚠️  No database file found - will create on first save")
     

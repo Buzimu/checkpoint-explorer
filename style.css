@@ -976,3 +976,84 @@ body {
 .model-card.drag-over .drop-indicator {
   display: flex;
 }
+
+/* Lightbox Controls */
+.lightbox-controls {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(40, 42, 54, 0.95);
+  padding: 16px 24px;
+  border-radius: 12px;
+  border: 2px solid #44475a;
+  z-index: 2002;
+}
+
+.lightbox-rating-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lightbox-rating-select {
+  padding: 8px 12px;
+  background: rgba(68, 71, 90, 0.7);
+  border: 1px solid #6272a4;
+  border-radius: 6px;
+  color: #f8f8f2;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lightbox-rating-select:hover {
+  border-color: #bd93f9;
+}
+
+.lightbox-rating-select:focus {
+  outline: none;
+  border-color: #ff79c6;
+  box-shadow: 0 0 0 3px rgba(255, 121, 198, 0.2);
+}
+
+.btn-lightbox-save {
+  padding: 8px 16px;
+  background: rgba(80, 250, 123, 0.2);
+  color: #50fa7b;
+  border: 1px solid #50fa7b;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-lightbox-save:hover {
+  background: #50fa7b;
+  color: #282a36;
+}
+
+.btn-lightbox-delete {
+  padding: 8px 16px;
+  background: rgba(255, 85, 85, 0.2);
+  color: #ff5555;
+  border: 1px solid #ff5555;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-lightbox-delete:hover {
+  background: #ff5555;
+  color: white;
+}
+
+#lightboxContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
