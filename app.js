@@ -973,8 +973,10 @@ class ModelExplorer {
 
     // Find the media item and model
     let model = this.selectedModel;
+    let actualModelPath = this.selectedModel?.path;
     if (modelPath) {
       model = this.modelData.models[modelPath];
+      actualModelPath = modelPath;
     }
 
     if (!model || !model.exampleImages) {
@@ -1029,12 +1031,12 @@ class ModelExplorer {
       </select>
       <button class="btn-lightbox-save" onclick="app.saveLightboxRating('${this.escapeAttribute(
         imagePath
-      )}', '${this.escapeAttribute(model.path)}')">💾 Save</button>
+      )}', '${this.escapeAttribute(actualModelPath)}')">💾 Save</button>
       <button class="btn-lightbox-delete" onclick="app.deleteLightboxMedia('${this.escapeAttribute(
         imagePath
-      )}', '${this.escapeAttribute(model.path)}')">🗑️ Delete</button>
-    </div>
-  `;
+      )}', '${this.escapeAttribute(actualModelPath)}')">🗑️ Delete</button>
+          </div>
+        `;
 
     lightbox.style.display = "flex";
   }
