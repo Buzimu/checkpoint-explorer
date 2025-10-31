@@ -1044,6 +1044,80 @@ class ModelExplorer {
     lightbox.style.display = "none";
   }
 
+  async saveLightboxRating(imagePath, modelPath) {
+    try {
+      const select = document.getElementById("lightboxRatingSelect");
+      const newRating = select.value;
+
+      const response = await fetch(
+        `/api/models/${encodeURIComponent(modelPath)}/update-media-rating`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: imagePath,
+            rating: newRating,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        this.showToast("✅ Rating updated!");
+        // Reload data to reflect changes
+        await this.loadFromServer();
+
+        // Re-select the model if it was selected
+        if (this.selectedModel?.path === modelPath) {
+          this.selectedModel = this.modelData.models[modelPath];
+          this.renderDetails(this.selectedModel);
+        }
+      } else {
+        this.showToast("❌ Failed to update rating");
+      }
+    } catch (error) {
+      console.error("Failed to update rating:", error);
+      this.showToast("❌ Failed to update rating");
+    }
+  }
+
+  async deleteLightboxMedia(imagePath, modelPath) {
+    if (!confirm("Are you sure you want to delete this media?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/models/${encodeURIComponent(modelPath)}/delete-media`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: imagePath,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        this.showToast("✅ Media deleted!");
+        this.closeLightbox();
+
+        // Reload data to reflect changes
+        await this.loadFromServer();
+
+        // Re-select the model if it was selected
+        if (this.selectedModel?.path === modelPath) {
+          this.selectedModel = this.modelData.models[modelPath];
+          this.renderDetails(this.selectedModel);
+        }
+      } else {
+        this.showToast("❌ Failed to delete media");
+      }
+    } catch (error) {
+      console.error("Failed to delete media:", error);
+      this.showToast("❌ Failed to delete media");
+    }
+  }
+
   toggleNsfwFilter() {
     this.nsfwFilterEnabled = !this.nsfwFilterEnabled;
     const icon = document.getElementById("nsfwIcon");
