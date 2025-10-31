@@ -571,7 +571,7 @@ class ModelExplorer {
                               img.filename
                             }', '${this.escapeAttribute(
                               img.caption || model.name
-                            )}')">
+                            )}', '${this.escapeAttribute(model.path)}')">
                               ${this.renderMediaElement(
                                 img,
                                 img.caption || model.name
