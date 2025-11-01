@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ComfyUI Model Explorer</title>
+    <link rel="stylesheet" href="static/css/style.css" />
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="app-title">🎨 ComfyUI Model Explorer</h1>
+        <span class="model-count" id="modelCount">0 models</span>
+      </div>
+      <div class="header-right">
+        <button class="btn btn-primary" id="loadJsonBtn">🔄 Reload</button>
+        <button class="btn btn-secondary" id="exportJsonBtn" disabled>
+          💾 Export JSON
+        </button>
+
+        <!-- Content Rating Dropdown -->
+        <select
+          class="rating-select"
+          id="contentRatingSelect"
+          title="Content Rating Filter"
+        >
+          <option value="pg">🟢 PG</option>
+          <option value="r">🟡 R</option>
+          <option value="x">🔴 X</option>
+        </select>
+
+        <!-- Video Toggle Button -->
+        <button
+          class="btn btn-icon"
+          id="videoToggle"
+          title="Showing images only (click to include videos)"
+        >
+          🖼️ Images
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+      <!-- Gallery View (Main Content) -->
+      <main class="gallery-container">
+        <!-- Filters -->
+        <div class="filters">
+          <input
+            type="text"
+            class="search-input"
+            id="searchInput"
+            placeholder="🔍 Search models..."
+          />
+
+          <div class="filter-group">
+            <label>Type:</label>
+            <select id="typeFilter" class="filter-select">
+              <option value="">All Types</option>
+              <option value="checkpoint">Checkpoint</option>
+              <option value="lora">LoRA</option>
+              <option value="controlnet">ControlNet</option>
+              <option value="upscaler">Upscaler</option>
+              <option value="vae">VAE</option>
+              <option value="embedding">Embedding</option>
+              <option value="hypernetwork">Hypernetwork</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label>Base Model:</label>
+            <select id="baseModelFilter" class="filter-select">
+              <option value="">All Base Models</option>
+              <option value="SD1.5">SD 1.5</option>
+              <option value="SDXL">SDXL</option>
+              <option value="Flux">Flux</option>
+              <option value="Pony">Pony</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label>
+              <input type="checkbox" id="favoritesFilter" />
+              ⭐ Favorites Only
+            </label>
+          </div>
+
+          <div class="filter-group">
+            <label>
+              <input type="checkbox" id="hasImagesFilter" />
+              🖼️ Has Images
+            </label>
+          </div>
+        </div>
+
+        <!-- Model Grid -->
+        <div class="model-grid" id="modelGrid">
+          <!-- Welcome screen shown initially -->
+          <div class="welcome-screen" id="welcomeScreen">
+            <h2>Welcome to Model Explorer</h2>
+            <p>Load your modeldb.json to get started</p>
+            <button
+              class="btn btn-primary btn-large"
+              onclick="document.getElementById('loadJsonBtn').click()"
+            >
+              📁 Load JSON File
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- Details Sidebar -->
+      <aside class="details-sidebar" id="detailsSidebar">
+        <div class="no-selection">
+          <p>Select a model to view details</p>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="editModal" style="display: none">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>✏️ Edit Model</h2>
+          <button class="btn-close" id="closeEditModal">✕</button>
+        </div>
+        <div class="modal-body" id="editModalBody">
+          <!-- Edit form will be injected here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Lightbox -->
+    <div class="lightbox-overlay" id="imageLightbox" style="display: none">
+      <button class="lightbox-close">✕</button>
+      <div id="lightboxContent"></div>
+      <div class="lightbox-caption" id="lightboxCaption"></div>
+      <div class="lightbox-controls" id="lightboxControls"></div>
+    </div>
+
+    <script src="static/js/app.js"></script>
+  </body>
+</html>
