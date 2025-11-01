@@ -15,6 +15,12 @@ DB_FILE = os.path.join(MODELS_DIR, 'modeldb.json')
 # Images directory location
 IMAGES_DIR = os.path.join(MODELS_DIR, 'images')
 
+# Backup directory location
+BACKUP_DIR = os.path.join(MODELS_DIR, 'db', 'backups')
+
+# Backup configuration
+MAX_BACKUPS = 10  # Keep only the last 10 backups
+
 # Flask configuration
 FLASK_CONFIG = {
     'host': '0.0.0.0',
