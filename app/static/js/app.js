@@ -20,6 +20,7 @@ class ModelExplorer {
         "vae",
         "embedding",
         "hypernetwork",
+        "unknown",
       ],
       baseModels: [
         "SD1.5",
@@ -29,6 +30,7 @@ class ModelExplorer {
         "Illustrious",
         "WAN21",
         "WAN22",
+        "unknown",
       ],
       contentRating: "pg",
       showVideos: false,
@@ -52,6 +54,12 @@ class ModelExplorer {
     document.getElementById("importJsonBtn").addEventListener("click", () => {
       this.openImportModal();
     });
+
+    document
+      .getElementById("closeImportModal")
+      .addEventListener("click", () => {
+        this.closeImportModal();
+      });
 
     document
       .getElementById("contentRatingSelect")
@@ -325,18 +333,26 @@ class ModelExplorer {
       .getElementById("searchInput")
       .value.toLowerCase();
 
-    // NEW: Get selected types (array of checked values)
+    // Get selected types
     const selectedTypes = Array.from(
       document.querySelectorAll("#typeCheckboxes input:checked")
     ).map((cb) => cb.value);
 
-    // NEW: Get selected base models (array of checked values)
+    // Get selected base models
     const selectedBases = Array.from(
       document.querySelectorAll("#baseCheckboxes input:checked")
     ).map((cb) => cb.value);
 
     const favoritesOnly = document.getElementById("favoritesFilter").checked;
     const hasImagesOnly = document.getElementById("hasImagesFilter").checked;
+
+    console.log("🔍 Applying filters:", {
+      searchTerm,
+      selectedTypes,
+      selectedBases,
+      favoritesOnly,
+      hasImagesOnly,
+    });
 
     this.filteredModels = Object.entries(this.modelData.models)
       .map(([path, model]) => ({ path, ...model }))
@@ -350,19 +366,41 @@ class ModelExplorer {
           return false;
         }
 
-        // NEW: Type filter (if any types are selected, model must match one)
-        if (
-          selectedTypes.length > 0 &&
-          !selectedTypes.includes(model.modelType)
-        ) {
+        // Type filter - if NO types selected, hide everything
+        if (selectedTypes.length === 0) {
           return false;
         }
 
-        // NEW: Base model filter (if any bases are selected, model must match one)
-        if (
-          selectedBases.length > 0 &&
-          !selectedBases.includes(model.baseModel)
-        ) {
+        // Check if model type should be considered "unknown"
+        const modelType = model.modelType || "unknown";
+        const isUnknownType =
+          !modelType || modelType === "" || modelType === "unknown";
+
+        // If "unknown" is selected and model is unknown, pass
+        if (selectedTypes.includes("unknown") && isUnknownType) {
+          // Allow through - unknown type and unknown filter is checked
+        }
+        // Otherwise check if model type matches selected filters
+        else if (!selectedTypes.includes(modelType)) {
+          return false;
+        }
+
+        // Base model filter - if NO bases selected, hide everything
+        if (selectedBases.length === 0) {
+          return false;
+        }
+
+        // Check if base model should be considered "unknown"
+        const baseModel = model.baseModel || "unknown";
+        const isUnknownBase =
+          !baseModel || baseModel === "" || baseModel === "unknown";
+
+        // If "unknown" is selected and model base is unknown, pass
+        if (selectedBases.includes("unknown") && isUnknownBase) {
+          // Allow through - unknown base and unknown filter is checked
+        }
+        // Otherwise check if base model matches selected filters
+        else if (!selectedBases.includes(baseModel)) {
           return false;
         }
 
@@ -382,6 +420,8 @@ class ModelExplorer {
         return true;
       })
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    console.log(`✅ Filtered to ${this.filteredModels.length} models`);
 
     this.renderModelGrid();
     this.updateModelCount();
@@ -1584,16 +1624,41 @@ class ModelExplorer {
     };
 
     // Build hash index of old database
+    // Include both primary hash and variant hashes
     const oldByHash = new Map();
+    const oldPaths = new Set();
+
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
+      oldPaths.add(path);
+
+      // Add primary hash
       if (model.fileHash) {
-        oldByHash.set(model.fileHash, { path, model });
-      } else {
-        console.warn("⚠️ Model without hash:", path);
+        if (!oldByHash.has(model.fileHash)) {
+          oldByHash.set(model.fileHash, []);
+        }
+        oldByHash.get(model.fileHash).push({ path, model });
+      }
+
+      // NEW: Add variant hashes
+      if (model.variants) {
+        if (model.variants.highHash) {
+          if (!oldByHash.has(model.variants.highHash)) {
+            oldByHash.set(model.variants.highHash, []);
+          }
+          oldByHash.get(model.variants.highHash).push({ path, model });
+        }
+        if (model.variants.lowHash) {
+          if (!oldByHash.has(model.variants.lowHash)) {
+            oldByHash.set(model.variants.lowHash, []);
+          }
+          oldByHash.get(model.variants.lowHash).push({ path, model });
+        }
       }
     });
 
-    console.log("📚 Old database:", oldByHash.size, "models with hashes");
+    console.log("📚 Old database:", oldPaths.size, "models indexed");
+
+    const processedOldPaths = new Set();
 
     // Process new database
     Object.entries(newDb.models || {}).forEach(([newPath, newModel]) => {
@@ -1604,9 +1669,15 @@ class ModelExplorer {
         return;
       }
 
+      // Check primary hash
+      let matched = false;
+
       if (oldByHash.has(hash)) {
-        // MATCHED: Model exists in both databases
-        const { path: oldPath, model: oldModel } = oldByHash.get(hash);
+        // Found by primary hash
+        const matches = oldByHash.get(hash);
+        const match = matches[0]; // Use first match
+        const { path: oldPath, model: oldModel } = match;
+
         result.matched.push({
           hash,
           oldPath,
@@ -1615,8 +1686,54 @@ class ModelExplorer {
           pathChanged: oldPath !== newPath,
         });
         result.stats.matched++;
-        oldByHash.delete(hash); // Mark as processed
-      } else {
+        processedOldPaths.add(oldPath);
+        matched = true;
+      }
+
+      // NEW: Check variant hashes
+      if (!matched && newModel.variants) {
+        if (
+          newModel.variants.highHash &&
+          oldByHash.has(newModel.variants.highHash)
+        ) {
+          const matches = oldByHash.get(newModel.variants.highHash);
+          const match = matches[0];
+          const { path: oldPath, model: oldModel } = match;
+
+          result.matched.push({
+            hash: newModel.variants.highHash,
+            oldPath,
+            newPath,
+            name: newModel.name || oldModel.name || "Unnamed",
+            pathChanged: oldPath !== newPath,
+            matchedViaVariant: true,
+          });
+          result.stats.matched++;
+          processedOldPaths.add(oldPath);
+          matched = true;
+        } else if (
+          newModel.variants.lowHash &&
+          oldByHash.has(newModel.variants.lowHash)
+        ) {
+          const matches = oldByHash.get(newModel.variants.lowHash);
+          const match = matches[0];
+          const { path: oldPath, model: oldModel } = match;
+
+          result.matched.push({
+            hash: newModel.variants.lowHash,
+            oldPath,
+            newPath,
+            name: newModel.name || oldModel.name || "Unnamed",
+            pathChanged: oldPath !== newPath,
+            matchedViaVariant: true,
+          });
+          result.stats.matched++;
+          processedOldPaths.add(oldPath);
+          matched = true;
+        }
+      }
+
+      if (!matched) {
         // NEW: Model only in new database
         result.new.push({
           hash,
@@ -1627,14 +1744,17 @@ class ModelExplorer {
       }
     });
 
-    // Remaining in oldByHash are MISSING
-    oldByHash.forEach(({ path, model }) => {
-      result.missing.push({
-        hash: model.fileHash,
-        path,
-        name: model.name || "Unnamed",
-      });
-      result.stats.missing++;
+    // Identify missing models (in old but not in new)
+    oldPaths.forEach((oldPath) => {
+      if (!processedOldPaths.has(oldPath)) {
+        const oldModel = oldDb.models[oldPath];
+        result.missing.push({
+          hash: oldModel.fileHash,
+          path: oldPath,
+          name: oldModel.name || "Unnamed",
+        });
+        result.stats.missing++;
+      }
     });
 
     console.log("✅ Analysis complete:", result.stats);
@@ -1753,11 +1873,20 @@ class ModelExplorer {
       models: {},
     };
 
-    // Build hash maps for quick lookup
+    // Build hash maps for quick lookup (including variant hashes)
     const oldByHash = new Map();
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
       if (model.fileHash) {
-        oldByHash.set(model.fileHash, model);
+        oldByHash.set(model.fileHash, { path, model });
+      }
+      // NEW: Map variant hashes too
+      if (model.variants) {
+        if (model.variants.highHash) {
+          oldByHash.set(model.variants.highHash, { path, model });
+        }
+        if (model.variants.lowHash) {
+          oldByHash.set(model.variants.lowHash, { path, model });
+        }
       }
     });
 
@@ -1770,9 +1899,29 @@ class ModelExplorer {
         return;
       }
 
+      let oldModel = null;
+
+      // Check primary hash
       if (oldByHash.has(hash)) {
+        oldModel = oldByHash.get(hash).model;
+      }
+      // NEW: Check variant hashes
+      else if (newModel.variants) {
+        if (
+          newModel.variants.highHash &&
+          oldByHash.has(newModel.variants.highHash)
+        ) {
+          oldModel = oldByHash.get(newModel.variants.highHash).model;
+        } else if (
+          newModel.variants.lowHash &&
+          oldByHash.has(newModel.variants.lowHash)
+        ) {
+          oldModel = oldByHash.get(newModel.variants.lowHash).model;
+        }
+      }
+
+      if (oldModel) {
         // MATCHED: Merge old and new data
-        const oldModel = oldByHash.get(hash);
         merged.models[newPath] = this.mergeModelData(oldModel, newModel);
         console.log("✅ Merged:", newPath);
       } else {
@@ -1784,7 +1933,7 @@ class ModelExplorer {
 
     // Process missing models (mark but keep)
     analysis.missing.forEach((item) => {
-      const oldModel = oldByHash.get(item.hash);
+      const oldModel = oldDb.models[item.path];
       if (oldModel) {
         const missingKey = `_missing/${item.path}`;
         merged.models[missingKey] = {
@@ -1806,50 +1955,93 @@ class ModelExplorer {
   }
 
   mergeModelData(oldModel, newModel) {
-    // Start with new model (has current filesystem data)
-    const merged = { ...newModel };
+    console.log("🔀 Merging model data...");
 
-    // Fields to preserve from old model if they have user data
-    const manualFields = [
-      "favorite",
-      "notes",
+    // Start with new model's filesystem data
+    const merged = {
+      name: newModel.name,
+      modelType: newModel.modelType,
+      fileType: newModel.fileType,
+      fileHash: newModel.fileHash,
+      fileSize: newModel.fileSize || oldModel.fileSize || 0,
+      fileSizeFormatted:
+        newModel.fileSizeFormatted || oldModel.fileSizeFormatted || "",
+    };
+
+    // NEW: Handle variants with dual hashes
+    if (newModel.variants) {
+      merged.variants = newModel.variants;
+    } else if (oldModel.variants) {
+      merged.variants = oldModel.variants;
+    }
+
+    // Fields that should ALWAYS be preserved from old model (user-entered data)
+    // ONLY copy if old model has non-empty values
+    const userFields = [
+      "baseModel",
+      "nsfw",
       "tags",
       "triggerWords",
+      "notes",
+      "recommendedSettings",
+      "examplePrompts",
+      "exampleImages",
       "civitaiUrl",
       "huggingFaceUrl",
       "githubUrl",
       "otherUrl",
-      "recommendedSettings",
-      "examplePrompts",
-      "exampleImages",
-      "nsfw",
+      "favorite",
     ];
 
-    manualFields.forEach((field) => {
+    userFields.forEach((field) => {
       const oldValue = oldModel[field];
+      const newValue = newModel[field];
 
-      // Skip if old value doesn't exist
-      if (oldValue === undefined || oldValue === null) {
-        return;
-      }
-
-      // Check if it's a non-empty value worth preserving
-      let shouldPreserve = false;
+      // Determine if old value has meaningful data
+      let oldHasData = false;
 
       if (Array.isArray(oldValue)) {
-        shouldPreserve = oldValue.length > 0;
-      } else if (typeof oldValue === "object") {
-        shouldPreserve = Object.keys(oldValue).length > 0;
+        oldHasData = oldValue.length > 0;
+      } else if (typeof oldValue === "object" && oldValue !== null) {
+        oldHasData = Object.keys(oldValue).length > 0;
       } else if (typeof oldValue === "boolean") {
-        shouldPreserve = true; // Always preserve boolean values
+        oldHasData = true; // Always preserve booleans
       } else if (typeof oldValue === "string") {
-        shouldPreserve = oldValue.trim() !== "";
-      } else {
-        shouldPreserve = true;
+        oldHasData = oldValue.trim() !== "";
       }
 
-      if (shouldPreserve) {
+      // If old has data, use it; otherwise check if new has data
+      if (oldHasData) {
         merged[field] = oldValue;
+        console.log(`  ✅ Preserved ${field} from old model`);
+      } else if (newValue !== undefined && newValue !== null) {
+        // Only use new value if it's not explicitly empty
+        let newHasData = false;
+
+        if (Array.isArray(newValue)) {
+          newHasData = newValue.length > 0;
+        } else if (typeof newValue === "object" && newValue !== null) {
+          newHasData = Object.keys(newValue).length > 0;
+        } else if (typeof newValue === "boolean") {
+          newHasData = true;
+        } else if (typeof newValue === "string") {
+          newHasData = newValue.trim() !== "";
+        }
+
+        if (newHasData) {
+          merged[field] = newValue;
+        } else {
+          // Both are empty, use appropriate default
+          if (Array.isArray(oldValue)) {
+            merged[field] = [];
+          } else if (typeof oldValue === "object" && oldValue !== null) {
+            merged[field] = {};
+          } else if (typeof oldValue === "boolean") {
+            merged[field] = false;
+          } else if (typeof oldValue === "string") {
+            merged[field] = "";
+          }
+        }
       }
     });
 
