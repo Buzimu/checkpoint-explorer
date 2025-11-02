@@ -8,6 +8,7 @@ class ModelExplorer {
     this.isDirty = false;
     this.serverMode = true;
     this.showVideos = false;
+    this.pendingMerge = null;
 
     // NEW: Default filter configuration
     this.DEFAULT_FILTERS = {
@@ -20,7 +21,15 @@ class ModelExplorer {
         "embedding",
         "hypernetwork",
       ],
-      baseModels: ["SD1.5", "SDXL", "Flux", "Pony", "Illustrious"],
+      baseModels: [
+        "SD1.5",
+        "SDXL",
+        "Flux",
+        "Pony",
+        "Illustrious",
+        "WAN21",
+        "WAN22",
+      ],
       contentRating: "pg",
       showVideos: false,
       favoritesOnly: false,
@@ -38,6 +47,10 @@ class ModelExplorer {
 
     document.getElementById("exportJsonBtn").addEventListener("click", () => {
       this.exportJson();
+    });
+
+    document.getElementById("importJsonBtn").addEventListener("click", () => {
+      this.openImportModal();
     });
 
     document
@@ -410,15 +423,20 @@ class ModelExplorer {
   }
 
   createModelCard(model) {
-    console.log("\n🎴 === createModelCard CALLED ===");
-    console.log("Model:", model.name);
+    //console.log("\n🎴 === createModelCard CALLED ===");
+    //console.log("Model:", model.name);
+
+    const isMissing = model._status === "missing";
+    const missingBadge = isMissing
+      ? '<div class="missing-badge">⚠️ MISSING</div>'
+      : "";
 
     // Check if model should be shown based on content rating
     if (!this.canShowModel(model)) {
-      console.log("  ❌ Model hidden by canShowModel()");
+      //console.log("  ❌ Model hidden by canShowModel()");
       return null;
     }
-    console.log("  ✅ Model passed canShowModel()");
+    //console.log("  ✅ Model passed canShowModel()");
 
     const card = document.createElement("div");
     card.className = "model-card";
@@ -429,24 +447,9 @@ class ModelExplorer {
     }
 
     // Get appropriate media for current rating
-    console.log("  Calling getAppropriateMedia()...");
+    //console.log("  Calling getAppropriateMedia()...");
     const appropriateMedia = this.getAppropriateMedia(model);
 
-    // Check if model should be shown based on content rating
-    //if (!this.canShowModel(model)) {
-    //  return null; // Hide card completely
-    // }
-
-    // const card = document.createElement("div");
-    // card.className = "model-card";
-    // card.dataset.modelPath = model.path;
-
-    //if (this.selectedModel?.path === model.path) {
-    //   card.classList.add("selected");
-    //}
-
-    // Get appropriate media for current rating
-    // const appropriateMedia = this.getAppropriateMedia(model);
     let mediaHtml;
 
     if (appropriateMedia) {
@@ -458,10 +461,12 @@ class ModelExplorer {
 
     // Add drop indicator for drag-drop
     const dropIndicator = `<div class="drop-indicator">📁</div>`;
+    //${missingBadge}
     //${imageHtml}
     card.innerHTML = `
             
             ${dropIndicator}
+            ${missingBadge}
             ${mediaHtml}
             <div class="model-info">
                 <div class="model-header">
@@ -707,6 +712,69 @@ class ModelExplorer {
                 }
             </div>
         `;
+
+    const missingWarning =
+      model._status === "missing"
+        ? `
+  <div class="missing-warning">
+    <div class="warning-header">Model File Not Found</div>
+    <p>This model was in your database but wasn't found in the last filesystem scan.</p>
+    <p><strong>Last known location:</strong></p>
+    <div class="last-seen-path">${this.escapeHtml(
+      model._lastSeenPath || "Unknown"
+    )}</div>
+    <p>The model may have been moved, renamed, or deleted.</p>
+    <button class="btn btn-danger" onclick="app.deleteMissingModel('${this.escapeAttribute(
+      model.path
+    )}')">
+      🗑️ Remove from Database
+    </button>
+  </div>
+`
+        : "";
+
+    // Add ${missingWarning} at the start of the details-content
+  }
+
+  async deleteMissingModel(path) {
+    if (
+      !confirm(
+        "Remove this missing model from the database?\n\nThis will delete all associated data including notes, tags, and images. This cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      console.log("🗑️ Deleting missing model:", path);
+
+      // Remove from local data
+      delete this.modelData.models[path];
+
+      // Save to server
+      const response = await fetch("/api/models", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(this.modelData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save database");
+      }
+
+      this.showToast("✅ Missing model removed");
+
+      // Reload and reset view
+      await this.loadFromServer();
+      this.selectedModel = null;
+      document.getElementById("detailsSidebar").innerHTML =
+        '<div class="no-selection"><p>Select a model to view details</p></div>';
+
+      console.log("✅ Missing model deleted successfully");
+    } catch (error) {
+      console.error("Failed to delete missing model:", error);
+      this.showToast("❌ Failed to delete: " + error.message);
+    }
   }
 
   renderRecommendedSettings(model) {
@@ -1371,6 +1439,423 @@ class ModelExplorer {
     console.log("=== applyContentRating DONE ===\n");
   }
 
+  openImportModal() {
+    const modal = document.getElementById("importModal");
+    const uploadStep = document.getElementById("uploadStep");
+    const previewStep = document.getElementById("previewStep");
+    const confirmBtn = document.getElementById("confirmMergeBtn");
+
+    // Reset to upload step
+    uploadStep.style.display = "block";
+    previewStep.style.display = "none";
+    confirmBtn.style.display = "none";
+
+    // Clear any pending merge
+    this.pendingMerge = null;
+
+    modal.style.display = "flex";
+
+    // Setup drag & drop (only once)
+    if (!this.importDragDropSetup) {
+      this.setupImportDragDrop();
+      this.importDragDropSetup = true;
+    }
+  }
+
+  closeImportModal() {
+    document.getElementById("importModal").style.display = "none";
+    this.pendingMerge = null;
+
+    // Clear file input
+    const fileInput = document.getElementById("importFileInput");
+    if (fileInput) fileInput.value = "";
+  }
+
+  setupImportDragDrop() {
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("importFileInput");
+
+    // Prevent default drag behaviors
+    ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+
+    // Visual feedback
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, () => {
+        dropZone.classList.add("drag-active");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, () => {
+        dropZone.classList.remove("drag-active");
+      });
+    });
+
+    // Handle drop
+    dropZone.addEventListener("drop", (e) => {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        this.handleImportFile(files[0]);
+      }
+    });
+
+    // Handle file input
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        this.handleImportFile(e.target.files[0]);
+      }
+    });
+
+    // Click to browse
+    dropZone.addEventListener("click", (e) => {
+      if (e.target === dropZone || e.target.closest(".drop-zone-content")) {
+        fileInput.click();
+      }
+    });
+  }
+
+  async handleImportFile(file) {
+    try {
+      console.log("📥 Importing file:", file.name);
+
+      if (!file.name.endsWith(".json")) {
+        this.showToast("❌ Please upload a JSON file");
+        return;
+      }
+
+      // Show loading state
+      const dropZone = document.getElementById("dropZone");
+      dropZone.classList.add("loading");
+
+      // Read file
+      const fileContent = await file.text();
+      const newDb = JSON.parse(fileContent);
+
+      // Remove loading state
+      dropZone.classList.remove("loading");
+
+      // Validate structure
+      if (!newDb.models || typeof newDb.models !== "object") {
+        this.showToast("❌ Invalid database format - missing models object");
+        return;
+      }
+
+      console.log(
+        "✅ Loaded new database:",
+        Object.keys(newDb.models).length,
+        "models"
+      );
+
+      // Perform merge analysis
+      const mergeResult = this.analyzeMerge(this.modelData, newDb);
+
+      console.log("📊 Merge analysis complete:", mergeResult.stats);
+
+      // Store for later
+      this.pendingMerge = {
+        newDb: newDb,
+        analysis: mergeResult,
+      };
+
+      // Show preview
+      this.showMergePreview(mergeResult);
+    } catch (error) {
+      console.error("Failed to import file:", error);
+      this.showToast("❌ Failed to read file: " + error.message);
+
+      const dropZone = document.getElementById("dropZone");
+      dropZone.classList.remove("loading");
+    }
+  }
+
+  analyzeMerge(oldDb, newDb) {
+    console.log("🔍 Analyzing merge...");
+
+    const result = {
+      matched: [],
+      new: [],
+      missing: [],
+      stats: { matched: 0, new: 0, missing: 0 },
+    };
+
+    // Build hash index of old database
+    const oldByHash = new Map();
+    Object.entries(oldDb.models || {}).forEach(([path, model]) => {
+      if (model.fileHash) {
+        oldByHash.set(model.fileHash, { path, model });
+      } else {
+        console.warn("⚠️ Model without hash:", path);
+      }
+    });
+
+    console.log("📚 Old database:", oldByHash.size, "models with hashes");
+
+    // Process new database
+    Object.entries(newDb.models || {}).forEach(([newPath, newModel]) => {
+      const hash = newModel.fileHash;
+
+      if (!hash) {
+        console.warn("⚠️ New model without hash:", newPath);
+        return;
+      }
+
+      if (oldByHash.has(hash)) {
+        // MATCHED: Model exists in both databases
+        const { path: oldPath, model: oldModel } = oldByHash.get(hash);
+        result.matched.push({
+          hash,
+          oldPath,
+          newPath,
+          name: newModel.name || oldModel.name || "Unnamed",
+          pathChanged: oldPath !== newPath,
+        });
+        result.stats.matched++;
+        oldByHash.delete(hash); // Mark as processed
+      } else {
+        // NEW: Model only in new database
+        result.new.push({
+          hash,
+          path: newPath,
+          name: newModel.name || "Unnamed",
+        });
+        result.stats.new++;
+      }
+    });
+
+    // Remaining in oldByHash are MISSING
+    oldByHash.forEach(({ path, model }) => {
+      result.missing.push({
+        hash: model.fileHash,
+        path,
+        name: model.name || "Unnamed",
+      });
+      result.stats.missing++;
+    });
+
+    console.log("✅ Analysis complete:", result.stats);
+
+    return result;
+  }
+
+  showMergePreview(analysis) {
+    const uploadStep = document.getElementById("uploadStep");
+    const previewStep = document.getElementById("previewStep");
+    const confirmBtn = document.getElementById("confirmMergeBtn");
+
+    // Switch to preview step
+    uploadStep.style.display = "none";
+    previewStep.style.display = "block";
+    confirmBtn.style.display = "block";
+
+    // Update stats
+    document.getElementById("matchedCount").textContent =
+      analysis.stats.matched;
+    document.getElementById("newCount").textContent = analysis.stats.new;
+    document.getElementById("missingCount").textContent =
+      analysis.stats.missing;
+
+    document.getElementById("matchedCountDetail").textContent =
+      analysis.stats.matched;
+    document.getElementById("newCountDetail").textContent = analysis.stats.new;
+    document.getElementById("missingCountDetail").textContent =
+      analysis.stats.missing;
+
+    // Populate detail lists
+    this.populateMergeList("matchedList", analysis.matched, "matched");
+    this.populateMergeList("newList", analysis.new, "new");
+    this.populateMergeList("missingList", analysis.missing, "missing");
+
+    // Setup confirm button
+    confirmBtn.onclick = () => this.executeMerge();
+  }
+
+  populateMergeList(elementId, items, type) {
+    const list = document.getElementById(elementId);
+
+    if (items.length === 0) {
+      list.innerHTML = '<div class="merge-detail-item empty">No items</div>';
+      return;
+    }
+
+    list.innerHTML = items
+      .map((item) => {
+        let html = `<div class="merge-detail-item ${type}">`;
+        html += `<div class="item-name">${this.escapeHtml(item.name)}</div>`;
+
+        if (type === "matched" && item.pathChanged) {
+          html += `<div class="item-path">${this.escapeHtml(
+            item.newPath
+          )}</div>`;
+          html += `<div class="item-note">📁 Path changed from: ${this.escapeHtml(
+            item.oldPath
+          )}</div>`;
+        } else {
+          html += `<div class="item-path">${this.escapeHtml(item.path)}</div>`;
+        }
+
+        html += "</div>";
+        return html;
+      })
+      .join("");
+  }
+
+  async executeMerge() {
+    if (!this.pendingMerge) {
+      console.error("No pending merge");
+      return;
+    }
+
+    try {
+      console.log("🔄 Executing merge...");
+      this.showToast("⏳ Merging databases...");
+
+      const { newDb, analysis } = this.pendingMerge;
+      const mergedDb = this.performMerge(this.modelData, newDb, analysis);
+
+      console.log("✅ Merge complete, saving...");
+
+      // Save merged database (will auto-backup)
+      const response = await fetch("/api/models", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mergedDb),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save merged database");
+      }
+
+      console.log("💾 Merge saved successfully");
+
+      // Reload data from server
+      await this.loadFromServer();
+
+      this.showToast(
+        `✅ Merge complete! ${analysis.stats.matched} matched, ${analysis.stats.new} new, ${analysis.stats.missing} missing`
+      );
+      this.closeImportModal();
+    } catch (error) {
+      console.error("Merge failed:", error);
+      this.showToast("❌ Merge failed: " + error.message);
+    }
+  }
+
+  performMerge(oldDb, newDb, analysis) {
+    console.log("🔀 Performing merge...");
+
+    const merged = {
+      version: newDb.version || oldDb.version || "1.0.0",
+      models: {},
+    };
+
+    // Build hash maps for quick lookup
+    const oldByHash = new Map();
+    Object.entries(oldDb.models || {}).forEach(([path, model]) => {
+      if (model.fileHash) {
+        oldByHash.set(model.fileHash, model);
+      }
+    });
+
+    // Process all models from new database
+    Object.entries(newDb.models).forEach(([newPath, newModel]) => {
+      const hash = newModel.fileHash;
+
+      if (!hash) {
+        console.warn("⚠️ Skipping model without hash:", newPath);
+        return;
+      }
+
+      if (oldByHash.has(hash)) {
+        // MATCHED: Merge old and new data
+        const oldModel = oldByHash.get(hash);
+        merged.models[newPath] = this.mergeModelData(oldModel, newModel);
+        console.log("✅ Merged:", newPath);
+      } else {
+        // NEW: Just add it
+        merged.models[newPath] = newModel;
+        console.log("➕ Added new:", newPath);
+      }
+    });
+
+    // Process missing models (mark but keep)
+    analysis.missing.forEach((item) => {
+      const oldModel = oldByHash.get(item.hash);
+      if (oldModel) {
+        const missingKey = `_missing/${item.path}`;
+        merged.models[missingKey] = {
+          ...oldModel,
+          _status: "missing",
+          _lastSeenPath: item.path,
+        };
+        console.log("⚠️ Marked as missing:", item.path);
+      }
+    });
+
+    console.log(
+      "✅ Merge complete:",
+      Object.keys(merged.models).length,
+      "total models"
+    );
+
+    return merged;
+  }
+
+  mergeModelData(oldModel, newModel) {
+    // Start with new model (has current filesystem data)
+    const merged = { ...newModel };
+
+    // Fields to preserve from old model if they have user data
+    const manualFields = [
+      "favorite",
+      "notes",
+      "tags",
+      "triggerWords",
+      "civitaiUrl",
+      "huggingFaceUrl",
+      "githubUrl",
+      "otherUrl",
+      "recommendedSettings",
+      "examplePrompts",
+      "exampleImages",
+      "nsfw",
+    ];
+
+    manualFields.forEach((field) => {
+      const oldValue = oldModel[field];
+
+      // Skip if old value doesn't exist
+      if (oldValue === undefined || oldValue === null) {
+        return;
+      }
+
+      // Check if it's a non-empty value worth preserving
+      let shouldPreserve = false;
+
+      if (Array.isArray(oldValue)) {
+        shouldPreserve = oldValue.length > 0;
+      } else if (typeof oldValue === "object") {
+        shouldPreserve = Object.keys(oldValue).length > 0;
+      } else if (typeof oldValue === "boolean") {
+        shouldPreserve = true; // Always preserve boolean values
+      } else if (typeof oldValue === "string") {
+        shouldPreserve = oldValue.trim() !== "";
+      } else {
+        shouldPreserve = true;
+      }
+
+      if (shouldPreserve) {
+        merged[field] = oldValue;
+      }
+    });
+
+    return merged;
+  }
+
   toggleVideoMode() {
     this.showVideos = !this.showVideos;
     const btn = document.getElementById("videoToggle");
@@ -1436,13 +1921,13 @@ class ModelExplorer {
   }
 
   getAppropriateMedia(model) {
-    console.log("=== getAppropriateMedia CALLED ===");
-    console.log("Model name:", model.name);
-    console.log("Current content rating:", this.contentRating);
-    console.log("Show videos:", this.showVideos);
+    //console.log("=== getAppropriateMedia CALLED ===");
+    //console.log("Model name:", model.name);
+    //console.log("Current content rating:", this.contentRating);
+    //console.log("Show videos:", this.showVideos);
 
     if (!model.exampleImages || model.exampleImages.length === 0) {
-      console.log("  ❌ No images found");
+      //console.log("  ❌ No images found");
       return null;
     }
 
