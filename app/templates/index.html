@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ComfyUI Model Explorer</title>
-    <link rel="stylesheet" href="static/css/style.css" />
+    <link rel="stylesheet" href="../static/css/style.css" />
   </head>
   <body>
     <!-- Header -->
@@ -47,6 +47,7 @@
       <main class="gallery-container">
         <!-- Filters -->
         <div class="filters">
+          <!-- Search Bar -->
           <input
             type="text"
             class="search-input"
@@ -54,40 +55,71 @@
             placeholder="🔍 Search models..."
           />
 
-          <div class="filter-group">
-            <label>Type:</label>
-            <select id="typeFilter" class="filter-select">
-              <option value="">All Types</option>
-              <option value="checkpoint">Checkpoint</option>
-              <option value="lora">LoRA</option>
-              <option value="controlnet">ControlNet</option>
-              <option value="upscaler">Upscaler</option>
-              <option value="vae">VAE</option>
-              <option value="embedding">Embedding</option>
-              <option value="hypernetwork">Hypernetwork</option>
-            </select>
+          <!-- Type Filters -->
+          <div class="filter-row">
+            <label class="filter-row-label">Type:</label>
+            <div class="checkbox-group-inline" id="typeCheckboxes">
+              <label
+                ><input type="checkbox" value="checkpoint" checked />
+                Checkpoint</label
+              >
+              <label><input type="checkbox" value="lora" checked /> LoRA</label>
+              <label
+                ><input type="checkbox" value="controlnet" checked />
+                ControlNet</label
+              >
+              <label
+                ><input type="checkbox" value="upscaler" checked />
+                Upscaler</label
+              >
+              <label><input type="checkbox" value="vae" checked /> VAE</label>
+              <label
+                ><input type="checkbox" value="embedding" checked />
+                Embedding</label
+              >
+              <label
+                ><input type="checkbox" value="hypernetwork" checked />
+                Hypernetwork</label
+              >
+            </div>
+            <button class="btn-filter-mini" onclick="app.selectAllTypes()">
+              Select All
+            </button>
+            <button class="btn-filter-mini" onclick="app.clearAllTypes()">
+              Clear
+            </button>
           </div>
 
-          <div class="filter-group">
-            <label>Base Model:</label>
-            <select id="baseModelFilter" class="filter-select">
-              <option value="">All Base Models</option>
-              <option value="SD1.5">SD 1.5</option>
-              <option value="SDXL">SDXL</option>
-              <option value="Flux">Flux</option>
-              <option value="Pony">Pony</option>
-            </select>
+          <!-- Base Model Filters -->
+          <div class="filter-row">
+            <label class="filter-row-label">Base:</label>
+            <div class="checkbox-group-inline" id="baseCheckboxes">
+              <label
+                ><input type="checkbox" value="SD1.5" checked /> SD1.5</label
+              >
+              <label><input type="checkbox" value="SDXL" checked /> SDXL</label>
+              <label><input type="checkbox" value="Flux" checked /> Flux</label>
+              <label><input type="checkbox" value="Pony" checked /> Pony</label>
+              <label
+                ><input type="checkbox" value="Illustrious" checked />
+                Illustrious</label
+              >
+            </div>
+            <button class="btn-filter-mini" onclick="app.selectAllBases()">
+              Select All
+            </button>
+            <button class="btn-filter-mini" onclick="app.clearAllBases()">
+              Clear
+            </button>
           </div>
 
-          <div class="filter-group">
-            <label>
+          <!-- Other Filters -->
+          <div class="filter-row">
+            <label class="filter-checkbox-label">
               <input type="checkbox" id="favoritesFilter" />
               ⭐ Favorites Only
             </label>
-          </div>
-
-          <div class="filter-group">
-            <label>
+            <label class="filter-checkbox-label">
               <input type="checkbox" id="hasImagesFilter" />
               🖼️ Has Images
             </label>
@@ -139,6 +171,6 @@
       <div class="lightbox-controls" id="lightboxControls"></div>
     </div>
 
-    <script src="static/js/app.js"></script>
+    <script src="../static/js/app.js"></script>
   </body>
 </html>

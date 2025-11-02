@@ -4,10 +4,28 @@ class ModelExplorer {
     this.modelData = null;
     this.filteredModels = [];
     this.selectedModel = null;
-    this.contentRating = "pg"; // pg, r, x
+    this.contentRating = "pg";
     this.isDirty = false;
-    this.serverMode = true; // Flask server mode
-    this.showVideos = false; // Toggle for video support
+    this.serverMode = true;
+    this.showVideos = false;
+
+    // NEW: Default filter configuration
+    this.DEFAULT_FILTERS = {
+      types: [
+        "checkpoint",
+        "lora",
+        "controlnet",
+        "upscaler",
+        "vae",
+        "embedding",
+        "hypernetwork",
+      ],
+      baseModels: ["SD1.5", "SDXL", "Flux", "Pony", "Illustrious"],
+      contentRating: "pg",
+      showVideos: false,
+      favoritesOnly: false,
+      hasImagesOnly: false,
+    };
 
     this.init();
   }
@@ -38,14 +56,22 @@ class ModelExplorer {
       this.applyFilters();
     });
 
-    document.getElementById("typeFilter").addEventListener("change", () => {
-      this.applyFilters();
-    });
-
+    // NEW: Type checkbox listeners (REMOVE old typeFilter dropdown listener)
     document
-      .getElementById("baseModelFilter")
-      .addEventListener("change", () => {
-        this.applyFilters();
+      .querySelectorAll('#typeCheckboxes input[type="checkbox"]')
+      .forEach((cb) => {
+        cb.addEventListener("change", () => {
+          this.applyFilters();
+        });
+      });
+
+    // NEW: Base model checkbox listeners (REMOVE old baseModelFilter dropdown listener)
+    document
+      .querySelectorAll('#baseCheckboxes input[type="checkbox"]')
+      .forEach((cb) => {
+        cb.addEventListener("change", () => {
+          this.applyFilters();
+        });
       });
 
     document
@@ -86,10 +112,89 @@ class ModelExplorer {
       }
     });
 
-    // Auto-load from server
+    // NEW: Reset filters to defaults on load (BEFORE loadFromServer)
+    this.resetFiltersToDefaults();
+
     // Setup drag and drop
     this.setupDragDrop();
+
+    // Auto-load from server
     this.loadFromServer();
+  }
+
+  resetFiltersToDefaults() {
+    console.log("🔧 Resetting filters to defaults...");
+
+    // Set all type checkboxes to checked
+    this.DEFAULT_FILTERS.types.forEach((type) => {
+      const checkbox = document.querySelector(
+        `#typeCheckboxes input[value="${type}"]`
+      );
+      if (checkbox) checkbox.checked = true;
+    });
+
+    // Set all base model checkboxes to checked
+    this.DEFAULT_FILTERS.baseModels.forEach((base) => {
+      const checkbox = document.querySelector(
+        `#baseCheckboxes input[value="${base}"]`
+      );
+      if (checkbox) checkbox.checked = true;
+    });
+
+    // Set content rating
+    document.getElementById("contentRatingSelect").value =
+      this.DEFAULT_FILTERS.contentRating;
+    this.contentRating = this.DEFAULT_FILTERS.contentRating;
+
+    // Set video toggle
+    this.showVideos = this.DEFAULT_FILTERS.showVideos;
+    const videoBtn = document.getElementById("videoToggle");
+    videoBtn.innerHTML = "🖼️ Images";
+    videoBtn.title = "Showing images only (click to include videos)";
+
+    // Set other filters
+    document.getElementById("favoritesFilter").checked =
+      this.DEFAULT_FILTERS.favoritesOnly;
+    document.getElementById("hasImagesFilter").checked =
+      this.DEFAULT_FILTERS.hasImagesOnly;
+
+    console.log("✅ Filters reset to defaults");
+  }
+
+  selectAllTypes() {
+    document
+      .querySelectorAll('#typeCheckboxes input[type="checkbox"]')
+      .forEach((cb) => {
+        cb.checked = true;
+      });
+    this.applyFilters();
+  }
+
+  clearAllTypes() {
+    document
+      .querySelectorAll('#typeCheckboxes input[type="checkbox"]')
+      .forEach((cb) => {
+        cb.checked = false;
+      });
+    this.applyFilters();
+  }
+
+  selectAllBases() {
+    document
+      .querySelectorAll('#baseCheckboxes input[type="checkbox"]')
+      .forEach((cb) => {
+        cb.checked = true;
+      });
+    this.applyFilters();
+  }
+
+  clearAllBases() {
+    document
+      .querySelectorAll('#baseCheckboxes input[type="checkbox"]')
+      .forEach((cb) => {
+        cb.checked = false;
+      });
+    this.applyFilters();
   }
 
   async loadFromServer() {
@@ -206,8 +311,17 @@ class ModelExplorer {
     const searchTerm = document
       .getElementById("searchInput")
       .value.toLowerCase();
-    const typeFilter = document.getElementById("typeFilter").value;
-    const baseModelFilter = document.getElementById("baseModelFilter").value;
+
+    // NEW: Get selected types (array of checked values)
+    const selectedTypes = Array.from(
+      document.querySelectorAll("#typeCheckboxes input:checked")
+    ).map((cb) => cb.value);
+
+    // NEW: Get selected base models (array of checked values)
+    const selectedBases = Array.from(
+      document.querySelectorAll("#baseCheckboxes input:checked")
+    ).map((cb) => cb.value);
+
     const favoritesOnly = document.getElementById("favoritesFilter").checked;
     const hasImagesOnly = document.getElementById("hasImagesFilter").checked;
 
@@ -223,13 +337,19 @@ class ModelExplorer {
           return false;
         }
 
-        // Type filter
-        if (typeFilter && model.modelType !== typeFilter) {
+        // NEW: Type filter (if any types are selected, model must match one)
+        if (
+          selectedTypes.length > 0 &&
+          !selectedTypes.includes(model.modelType)
+        ) {
           return false;
         }
 
-        // Base model filter
-        if (baseModelFilter && model.baseModel !== baseModelFilter) {
+        // NEW: Base model filter (if any bases are selected, model must match one)
+        if (
+          selectedBases.length > 0 &&
+          !selectedBases.includes(model.baseModel)
+        ) {
           return false;
         }
 

@@ -1057,3 +1057,133 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+/* Horizontal Filter Layout Updates */
+.filters {
+  padding: 16px 24px;
+  background: rgba(40, 42, 54, 0.7);
+  border-bottom: 1px solid #44475a;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-input {
+  width: 100%;
+  max-width: 600px;
+  padding: 10px 16px;
+  background: rgba(68, 71, 90, 0.5);
+  border: 1px solid #6272a4;
+  border-radius: 8px;
+  color: #f8f8f2;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #bd93f9;
+  box-shadow: 0 0 0 3px rgba(189, 147, 249, 0.1);
+}
+
+.search-input::placeholder {
+  color: #6272a4;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffb86c;
+  min-width: 50px;
+}
+
+.checkbox-group-inline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.checkbox-group-inline label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #f8f8f2;
+  cursor: pointer;
+  padding: 4px 10px;
+  background: rgba(68, 71, 90, 0.3);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.checkbox-group-inline label:hover {
+  background: rgba(98, 114, 164, 0.3);
+  border-color: #6272a4;
+}
+
+.checkbox-group-inline input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.filter-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #f8f8f2;
+  cursor: pointer;
+  padding: 6px 12px;
+  background: rgba(68, 71, 90, 0.3);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.filter-checkbox-label:hover {
+  background: rgba(98, 114, 164, 0.3);
+  border-color: #6272a4;
+}
+
+.filter-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.btn-filter-mini {
+  padding: 4px 10px;
+  font-size: 11px;
+  background: rgba(98, 114, 164, 0.2);
+  color: #6272a4;
+  border: 1px solid #6272a4;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-filter-mini:hover {
+  background: rgba(189, 147, 249, 0.2);
+  color: #bd93f9;
+  border-color: #bd93f9;
+}
+
+/* Remove old filter-group styles (keep for backwards compatibility but hide) */
+.filter-group {
+  display: none;
+}
+
+.filter-select {
+  display: none;
+}
