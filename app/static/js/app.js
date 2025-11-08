@@ -2112,26 +2112,20 @@ class ModelExplorer {
     return hasAppropriateImage;
   }
 
+  // FIXED getAppropriateMedia - Replace in app.js around line 1750
+
   getAppropriateMedia(model) {
-    //console.log("=== getAppropriateMedia CALLED ===");
-    //console.log("Model name:", model.name);
-    //console.log("Current content rating:", this.contentRating);
-    //console.log("Show videos:", this.showVideos);
+    console.log("=== getAppropriateMedia CALLED ===");
+    console.log("Model name:", model.name);
+    console.log("Current content rating:", this.contentRating);
+    console.log("Show videos:", this.showVideos);
 
     if (!model.exampleImages || model.exampleImages.length === 0) {
-      //console.log("  ❌ No images found");
+      console.log("  ❌ No images found");
       return null;
     }
 
-    console.log("Total images:", model.exampleImages.length);
-    model.exampleImages.forEach((img, i) => {
-      console.log(
-        `  Image ${i}:`,
-        img.filename,
-        "Rating:",
-        img.rating || "NONE"
-      );
-    });
+    console.log("Total media items:", model.exampleImages.length);
 
     const currentRatingValue = this.getRatingValue(this.contentRating);
     console.log("Current rating value:", currentRatingValue);
@@ -2146,7 +2140,7 @@ class ModelExplorer {
       return passes;
     });
 
-    console.log("After rating filter:", appropriateMedia.length, "images");
+    console.log("After rating filter:", appropriateMedia.length, "items");
 
     if (appropriateMedia.length === 0) {
       console.log("  ❌ No appropriate media found");
@@ -2158,21 +2152,50 @@ class ModelExplorer {
       const imagesOnly = appropriateMedia.filter((item) => {
         const ext = (item.filename || "").toLowerCase();
         const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
-        console.log(`    ${item.filename} is video: ${isVideo}`);
+        console.log(
+          `    ${item.filename} is video: ${isVideo} - ${
+            isVideo ? "FILTERED OUT" : "KEPT"
+          }`
+        );
         return !isVideo;
       });
       appropriateMedia = imagesOnly.length > 0 ? imagesOnly : appropriateMedia;
-      console.log("After video filter:", appropriateMedia.length, "images");
+      console.log("After video filter:", appropriateMedia.length, "items");
     }
 
-    // Sort by rating value (highest first)
+    // NEW SORTING LOGIC: Prioritize videos when showVideos is true
     appropriateMedia.sort((a, b) => {
+      const extA = (a.filename || "").toLowerCase();
+      const extB = (b.filename || "").toLowerCase();
+      const isVideoA = extA.endsWith(".mp4") || extA.endsWith(".webm");
+      const isVideoB = extB.endsWith(".mp4") || extB.endsWith(".webm");
+
+      // If showVideos is true, prefer videos over images
+      if (this.showVideos) {
+        if (isVideoA && !isVideoB) {
+          console.log(
+            `  Sorting: ${a.filename} (video) > ${b.filename} (image)`
+          );
+          return -1; // a comes first (video preferred)
+        }
+        if (!isVideoA && isVideoB) {
+          console.log(
+            `  Sorting: ${b.filename} (video) > ${a.filename} (image)`
+          );
+          return 1; // b comes first (video preferred)
+        }
+      }
+
+      // If both are same type (both videos or both images), sort by rating
       const ratingA = a.rating || "pg";
       const ratingB = b.rating || "pg";
       const valA = this.getRatingValue(ratingA);
       const valB = this.getRatingValue(ratingB);
-      console.log(`  Sort: ${a.filename}(${valA}) vs ${b.filename}(${valB})`);
-      return valB - valA;
+
+      console.log(
+        `  Sorting by rating: ${a.filename}(${valA}) vs ${b.filename}(${valB})`
+      );
+      return valB - valA; // Higher rating first
     });
 
     console.log(
@@ -2186,26 +2209,47 @@ class ModelExplorer {
     return appropriateMedia[0];
   }
 
+  // FIXED renderMediaElement with reliable looping - Replace in app.js
+
   renderMediaElement(media, altText) {
     const filename = media.filename || "";
     const ext = filename.toLowerCase().split(".").pop();
     const isVideo = ext === "mp4" || ext === "webm";
 
     if (isVideo && this.showVideos) {
+      // Determine video MIME type
+      const mimeType = ext === "mp4" ? "video/mp4" : "video/webm";
+
+      // Generate unique ID for this video
+      const videoId = `video_${Math.random().toString(36).substr(2, 9)}`;
+
       return `
-      <video class="model-media" autoplay loop muted playsinline>
-        <source src="images/${media.filename}" type="video/${ext.replace(
-        ".",
-        ""
-      )}">
-        <div class="model-placeholder">🎬</div>
+      <video 
+        id="${videoId}"
+        class="model-media" 
+        autoplay 
+        loop 
+        muted 
+        playsinline
+        preload="auto"
+        onended="this.currentTime = 0; this.play();"
+        onerror="console.error('❌ Video failed to load:', '${filename}'); this.style.display='none'; this.parentElement.innerHTML='<div class=\\'model-placeholder\\'>⚠️ Video Error</div>';"
+        onloadeddata="console.log('✅ Video loaded:', '${filename}'); this.play();"
+      >
+        <source src="images/${filename}" type="${mimeType}">
+        Your browser does not support the video tag.
       </video>
     `;
     } else if (isVideo && !this.showVideos) {
       // Video exists but videos are disabled - show placeholder
       return `<div class="model-placeholder">🎬</div>`;
     } else {
-      return `<img src="images/${media.filename}" alt="${altText}" class="model-media">`;
+      return `<img 
+      src="images/${filename}" 
+      alt="${altText}" 
+      class="model-media"
+      onerror="console.error('❌ Image failed to load:', '${filename}'); this.style.display='none'; this.parentElement.innerHTML='<div class=\\'model-placeholder\\'>⚠️ Image Error</div>';"
+    >`;
     }
   }
 

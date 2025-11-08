@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebM Diagnostic Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1b26;
+            color: #f8f8f2;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #282a36;
+            border: 2px solid #44475a;
+            border-radius: 8px;
+        }
+        .test-section h2 {
+            color: #bd93f9;
+            margin-top: 0;
+        }
+        video {
+            max-width: 100%;
+            border: 2px solid #6272a4;
+            border-radius: 4px;
+        }
+        .log {
+            background: #1a1b26;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 3px solid #50fa7b;
+            font-size: 12px;
+        }
+        .error {
+            border-left-color: #ff5555;
+            color: #ff5555;
+        }
+        .warning {
+            border-left-color: #ffb86c;
+            color: #ffb86c;
+        }
+        input {
+            padding: 8px;
+            background: #44475a;
+            border: 1px solid #6272a4;
+            color: #f8f8f2;
+            border-radius: 4px;
+            width: 300px;
+        }
+        button {
+            padding: 8px 16px;
+            background: #bd93f9;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+        button:hover {
+            background: #ff79c6;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 WebM Diagnostic Tool</h1>
+    
+    <div class="test-section">
+        <h2>1. Browser Codec Support Test</h2>
+        <div id="codecSupport"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Test Your WebM File</h2>
+        <p>Enter the filename of a WebM file in your images directory:</p>
+        <input type="text" id="webmFilename" placeholder="filename.webm" value="">
+        <button onclick="testWebM()">Test File</button>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Detection Logic Test</h2>
+        <div id="detectionTest"></div>
+    </div>
+
+    <script>
+        // Test 1: Check codec support
+        function testCodecSupport() {
+            const video = document.createElement('video');
+            const results = document.getElementById('codecSupport');
+            
+            const codecs = [
+                ['video/webm; codecs="vp8, vorbis"', 'WebM VP8 + Vorbis'],
+                ['video/webm; codecs="vp9, opus"', 'WebM VP9 + Opus'],
+                ['video/webm; codecs="vp9"', 'WebM VP9 (no audio)'],
+                ['video/webm', 'WebM (generic)'],
+                ['video/mp4; codecs="avc1.42E01E, mp4a.40.2"', 'MP4 H.264 + AAC']
+            ];
+            
+            let html = '';
+            codecs.forEach(([type, label]) => {
+                const support = video.canPlayType(type);
+                const status = support === 'probably' ? '✅ Full Support' : 
+                              support === 'maybe' ? '⚠️ Maybe' : 
+                              '❌ Not Supported';
+                const cssClass = support === 'probably' ? '' : 
+                                support === 'maybe' ? 'warning' : 
+                                'error';
+                html += `<div class="log ${cssClass}"><strong>${label}:</strong> ${status} (${support || 'empty'})</div>`;
+            });
+            
+            results.innerHTML = html;
+        }
+
+        // Test 2: Test actual WebM file
+        function testWebM() {
+            const filename = document.getElementById('webmFilename').value.trim();
+            const results = document.getElementById('testResults');
+            
+            if (!filename) {
+                results.innerHTML = '<div class="log error">Please enter a filename</div>';
+                return;
+            }
+            
+            const url = `/images/${filename}`;
+            
+            results.innerHTML = `
+                <div class="log">Testing file: ${filename}</div>
+                <div class="log">URL: ${url}</div>
+            `;
+            
+            // Test 1: Fetch to check MIME type
+            fetch(url)
+                .then(response => {
+                    const contentType = response.headers.get('Content-Type');
+                    const log1 = document.createElement('div');
+                    log1.className = contentType === 'video/webm' ? 'log' : 'log error';
+                    log1.innerHTML = `<strong>Content-Type:</strong> ${contentType} ${contentType === 'video/webm' ? '✅' : '❌'}`;
+                    results.appendChild(log1);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    // Test 2: Try to create video element
+                    const videoTest = document.createElement('video');
+                    videoTest.style.maxWidth = '100%';
+                    videoTest.controls = true;
+                    videoTest.autoplay = true;
+                    videoTest.loop = true;
+                    videoTest.muted = true;
+                    
+                    const source = document.createElement('source');
+                    source.src = url;
+                    source.type = 'video/webm';
+                    
+                    videoTest.appendChild(source);
+                    
+                    videoTest.addEventListener('loadeddata', () => {
+                        const log2 = document.createElement('div');
+                        log2.className = 'log';
+                        log2.innerHTML = '✅ <strong>Video loaded successfully!</strong>';
+                        results.appendChild(log2);
+                        
+                        const log3 = document.createElement('div');
+                        log3.className = 'log';
+                        log3.innerHTML = `
+                            <strong>Video properties:</strong><br>
+                            Duration: ${videoTest.duration.toFixed(2)}s<br>
+                            Width: ${videoTest.videoWidth}px<br>
+                            Height: ${videoTest.videoHeight}px
+                        `;
+                        results.appendChild(log3);
+                    });
+                    
+                    videoTest.addEventListener('error', (e) => {
+                        const log2 = document.createElement('div');
+                        log2.className = 'log error';
+                        log2.innerHTML = `❌ <strong>Video failed to load!</strong><br>Error: ${videoTest.error ? videoTest.error.message : 'Unknown'}`;
+                        results.appendChild(log2);
+                    });
+                    
+                    results.appendChild(videoTest);
+                })
+                .catch(error => {
+                    const log = document.createElement('div');
+                    log.className = 'log error';
+                    log.innerHTML = `❌ <strong>Fetch failed:</strong> ${error.message}`;
+                    results.appendChild(log);
+                });
+        }
+
+        // Test 3: Detection logic
+        function testDetection() {
+            const results = document.getElementById('detectionTest');
+            
+            const testFiles = [
+                'test.webm',
+                'TEST.WEBM',
+                'video.WebM',
+                'file.mp4',
+                'image.png',
+                'something.webm.old',
+                '.webm'
+            ];
+            
+            let html = '<div class="log"><strong>Testing file extension detection:</strong></div>';
+            
+            testFiles.forEach(filename => {
+                const ext = filename.toLowerCase().split(".").pop();
+                const isVideo = ext === "mp4" || ext === "webm";
+                
+                html += `<div class="log">
+                    <strong>${filename}</strong><br>
+                    Extension: "${ext}"<br>
+                    Detected as video: ${isVideo ? '✅ YES' : '❌ NO'}
+                </div>`;
+            });
+            
+            results.innerHTML = html;
+        }
+
+        // Run tests on load
+        window.addEventListener('DOMContentLoaded', () => {
+            testCodecSupport();
+            testDetection();
+        });
+    </script>
+</body>
+</html>
