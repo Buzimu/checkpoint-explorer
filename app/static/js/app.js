@@ -409,9 +409,12 @@ class ModelExplorer {
           return false;
         }
 
-        // Has images filter
-        if (hasImagesOnly && (!mediaArray || mediaArray.length === 0)) {
-          return false;
+        // Has images filter - FIX: Define mediaArray properly
+        if (hasImagesOnly) {
+          const mediaArray = model.exampleImages || [];
+          if (mediaArray.length === 0) {
+            return false;
+          }
         }
 
         return true;
@@ -544,6 +547,9 @@ class ModelExplorer {
 
   renderDetails(model) {
     const sidebar = document.getElementById("detailsSidebar");
+
+    // FIX: Define mediaArray from model.exampleImages
+    const mediaArray = model.exampleImages || [];
 
     sidebar.innerHTML = `
             <div class="details-content">
@@ -1204,7 +1210,10 @@ class ModelExplorer {
       actualModelPath = modelPath;
     }
 
-    if (!model || !mediaArray) {
+    // FIX: Define mediaArray from model.exampleImages
+    const mediaArray = model?.exampleImages || [];
+
+    if (!model || !mediaArray || mediaArray.length === 0) {
       console.error("Model or images not found");
       return;
     }
@@ -2068,7 +2077,10 @@ class ModelExplorer {
   }
 
   getModelMaxRating(model) {
-    if (!mediaArray || mediaArray.length === 0) {
+    // FIX: Define mediaArray from model.exampleImages
+    const mediaArray = model.exampleImages || [];
+
+    if (mediaArray.length === 0) {
       return "pg";
     }
 
@@ -2118,8 +2130,6 @@ class ModelExplorer {
     return hasAppropriateImage;
   }
 
-  // FIXED getAppropriateMedia - Replace in app.js around line 1750
-
   getAppropriateMedia(model) {
     console.log("=== getAppropriateMedia CALLED ===");
     console.log("Model name:", model.name);
@@ -2128,13 +2138,12 @@ class ModelExplorer {
 
     // DEFENSIVE: Handle both array and object formats during migration
     if (!model.exampleImages) {
-      // ✅ Check model.exampleImages, not mediaArray
       console.log("  ❌ No exampleImages property");
       return null;
     }
 
     // Convert object to array if needed (migration from old format)
-    let mediaArray = model.exampleImages; // ✅ Initialize from model.exampleImages
+    let mediaArray = model.exampleImages;
     if (!Array.isArray(mediaArray)) {
       console.log("  ⚠️ exampleImages is not an array, converting...");
       if (typeof mediaArray === "object") {
@@ -2234,8 +2243,6 @@ class ModelExplorer {
 
     return appropriateMedia[0];
   }
-
-  // FIXED renderMediaElement with reliable looping - Replace in app.js
 
   renderMediaElement(media, altText) {
     const filename = media.filename || "";
