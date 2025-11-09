@@ -36,7 +36,29 @@ class ModelExplorer {
       showVideos: false,
       favoritesOnly: false,
       hasImagesOnly: false,
+      showMissing: false, // NEW: Filter for missing models
+      showMismatch: false, // NEW: Filter for mismatched models
     };
+
+    // BUGFIX #4: Define valid types and bases for mismatch detection
+    this.VALID_TYPES = [
+      "checkpoint",
+      "lora",
+      "controlnet",
+      "upscaler",
+      "vae",
+      "embedding",
+      "hypernetwork",
+    ];
+    this.VALID_BASES = [
+      "SD1.5",
+      "SDXL",
+      "Flux",
+      "Pony",
+      "Illustrious",
+      "WAN 2.1",
+      "WAN 2.2",
+    ];
 
     this.init();
   }
@@ -72,25 +94,28 @@ class ModelExplorer {
       this.toggleVideoMode();
     });
 
-    // Search and filter listeners
+    // Search and filter listeners - BUGFIX #2: Ensure filters apply immediately
     document.getElementById("searchInput").addEventListener("input", () => {
+      console.log("🔍 Search input changed");
       this.applyFilters();
     });
 
-    // NEW: Type checkbox listeners (REMOVE old typeFilter dropdown listener)
+    // Type checkbox listeners
     document
       .querySelectorAll('#typeCheckboxes input[type="checkbox"]')
       .forEach((cb) => {
         cb.addEventListener("change", () => {
+          console.log("📋 Type filter changed");
           this.applyFilters();
         });
       });
 
-    // NEW: Base model checkbox listeners (REMOVE old baseModelFilter dropdown listener)
+    // Base model checkbox listeners
     document
       .querySelectorAll('#baseCheckboxes input[type="checkbox"]')
       .forEach((cb) => {
         cb.addEventListener("change", () => {
+          console.log("🏗️ Base filter changed");
           this.applyFilters();
         });
       });
@@ -98,14 +123,27 @@ class ModelExplorer {
     document
       .getElementById("favoritesFilter")
       .addEventListener("change", () => {
+        console.log("⭐ Favorites filter changed");
         this.applyFilters();
       });
 
     document
       .getElementById("hasImagesFilter")
       .addEventListener("change", () => {
+        console.log("🖼️ Has images filter changed");
         this.applyFilters();
       });
+
+    // BUGFIX #4: New filter listeners
+    document.getElementById("missingFilter").addEventListener("change", () => {
+      console.log("⚠️ Missing filter changed");
+      this.applyFilters();
+    });
+
+    document.getElementById("mismatchFilter").addEventListener("change", () => {
+      console.log("🔀 Mismatch filter changed");
+      this.applyFilters();
+    });
 
     // Modal close
     document.getElementById("closeEditModal").addEventListener("click", () => {
@@ -133,7 +171,7 @@ class ModelExplorer {
       }
     });
 
-    // NEW: Reset filters to defaults on load (BEFORE loadFromServer)
+    // Reset filters to defaults on load
     this.resetFiltersToDefaults();
 
     // Setup drag and drop
@@ -178,6 +216,12 @@ class ModelExplorer {
       this.DEFAULT_FILTERS.favoritesOnly;
     document.getElementById("hasImagesFilter").checked =
       this.DEFAULT_FILTERS.hasImagesOnly;
+
+    // BUGFIX #4: Reset new filters
+    document.getElementById("missingFilter").checked =
+      this.DEFAULT_FILTERS.showMissing;
+    document.getElementById("mismatchFilter").checked =
+      this.DEFAULT_FILTERS.showMismatch;
 
     console.log("✅ Filters reset to defaults");
   }
@@ -227,8 +271,8 @@ class ModelExplorer {
       this.modelData = data;
       this.mergeHighLowVariants(); // Merge HIGH/LOW variants
       this.isDirty = false;
-      this.processModels();
-      this.renderModelGrid();
+      this.processModels(); // This will tag mismatches
+      this.applyFilters(); // BUGFIX #2: Explicit call after loading
       this.updateModelCount();
 
       // Enable export button
@@ -312,22 +356,63 @@ class ModelExplorer {
   }
 
   processModels() {
+    // BUGFIX #4: Tag models with mismatches during processing
+    console.log("🔄 Processing models and tagging mismatches...");
+
     // Convert models object to array with keys
     this.filteredModels = Object.entries(this.modelData.models).map(
-      ([path, model]) => ({
-        path,
-        ...model,
-      })
+      ([path, model]) => {
+        // Check for type mismatch
+        const modelType = (model.modelType || "").toLowerCase();
+        const hasTypeMismatch =
+          modelType &&
+          modelType !== "unknown" &&
+          !this.VALID_TYPES.includes(modelType);
+
+        // Check for base mismatch
+        const baseModel = (model.baseModel || "").trim();
+        const hasBaseMismatch =
+          baseModel &&
+          baseModel !== "unknown" &&
+          !this.VALID_BASES.includes(baseModel);
+
+        // Tag model with mismatch status
+        const modelWithFlags = {
+          path,
+          ...model,
+          _hasMismatch: hasTypeMismatch || hasBaseMismatch,
+          _typeMismatch: hasTypeMismatch,
+          _baseMismatch: hasBaseMismatch,
+        };
+
+        if (hasTypeMismatch || hasBaseMismatch) {
+          console.log(`🔀 Mismatch detected: ${model.name}`, {
+            type: model.modelType,
+            base: model.baseModel,
+            typeMismatch: hasTypeMismatch,
+            baseMismatch: hasBaseMismatch,
+          });
+        }
+
+        return modelWithFlags;
+      }
     );
 
     // Sort by name
     this.filteredModels.sort((a, b) =>
       (a.name || "").localeCompare(b.name || "")
     );
+
+    console.log("✅ Models processed");
   }
 
   applyFilters() {
-    if (!this.modelData) return;
+    if (!this.modelData) {
+      console.log("⚠️ No model data loaded yet");
+      return;
+    }
+
+    console.log("\n🔍 === APPLY FILTERS START ===");
 
     const searchTerm = document
       .getElementById("searchInput")
@@ -346,61 +431,90 @@ class ModelExplorer {
     const favoritesOnly = document.getElementById("favoritesFilter").checked;
     const hasImagesOnly = document.getElementById("hasImagesFilter").checked;
 
-    console.log("🔍 Applying filters:", {
+    // BUGFIX #4: Get new filter states
+    const showMissingOnly = document.getElementById("missingFilter").checked;
+    const showMismatchOnly = document.getElementById("mismatchFilter").checked;
+
+    console.log("Filter settings:", {
       searchTerm,
       selectedTypes,
       selectedBases,
       favoritesOnly,
       hasImagesOnly,
+      showMissingOnly,
+      showMismatchOnly,
     });
 
     this.filteredModels = Object.entries(this.modelData.models)
-      .map(([path, model]) => ({ path, ...model }))
+      .map(([path, model]) => {
+        // Re-check mismatch flags
+        const modelType = (model.modelType || "").toLowerCase();
+        const hasTypeMismatch =
+          modelType &&
+          modelType !== "unknown" &&
+          !this.VALID_TYPES.includes(modelType);
+
+        const baseModel = (model.baseModel || "").trim();
+        const hasBaseMismatch =
+          baseModel &&
+          baseModel !== "unknown" &&
+          !this.VALID_BASES.includes(baseModel);
+
+        return {
+          path,
+          ...model,
+          _hasMismatch: hasTypeMismatch || hasBaseMismatch,
+          _typeMismatch: hasTypeMismatch,
+          _baseMismatch: hasBaseMismatch,
+        };
+      })
       .filter((model) => {
-        // Search filter
-        if (
-          searchTerm &&
-          !model.name.toLowerCase().includes(searchTerm) &&
-          !model.tags?.some((tag) => tag.toLowerCase().includes(searchTerm))
-        ) {
-          return false;
+        // BUGFIX #1: Defensive check for tags array
+        if (searchTerm) {
+          const nameMatch = (model.name || "")
+            .toLowerCase()
+            .includes(searchTerm);
+          const tagsMatch =
+            Array.isArray(model.tags) &&
+            model.tags.some((tag) =>
+              (tag || "").toLowerCase().includes(searchTerm)
+            );
+
+          if (!nameMatch && !tagsMatch) {
+            console.log(`  ❌ Search filter: ${model.name}`);
+            return false;
+          }
         }
 
-        // Type filter - if NO types selected, hide everything
+        // Type filter
         if (selectedTypes.length === 0) {
+          console.log(`  ❌ No types selected`);
           return false;
         }
 
-        // Check if model type should be considered "unknown"
         const modelType = model.modelType || "unknown";
         const isUnknownType =
           !modelType || modelType === "" || modelType === "unknown";
 
-        // If "unknown" is selected and model is unknown, pass
         if (selectedTypes.includes("unknown") && isUnknownType) {
-          // Allow through - unknown type and unknown filter is checked
-        }
-        // Otherwise check if model type matches selected filters
-        else if (!selectedTypes.includes(modelType)) {
+          // Allow through
+        } else if (!selectedTypes.includes(modelType)) {
           return false;
         }
 
-        // Base model filter - if NO bases selected, hide everything
+        // Base model filter
         if (selectedBases.length === 0) {
+          console.log(`  ❌ No bases selected`);
           return false;
         }
 
-        // Check if base model should be considered "unknown"
         const baseModel = model.baseModel || "unknown";
         const isUnknownBase =
           !baseModel || baseModel === "" || baseModel === "unknown";
 
-        // If "unknown" is selected and model base is unknown, pass
         if (selectedBases.includes("unknown") && isUnknownBase) {
-          // Allow through - unknown base and unknown filter is checked
-        }
-        // Otherwise check if base model matches selected filters
-        else if (!selectedBases.includes(baseModel)) {
+          // Allow through
+        } else if (!selectedBases.includes(baseModel)) {
           return false;
         }
 
@@ -409,12 +523,26 @@ class ModelExplorer {
           return false;
         }
 
-        // Has images filter - FIX: Define mediaArray properly
+        // BUGFIX #5: Has images filter with defensive array check
         if (hasImagesOnly) {
-          const mediaArray = model.exampleImages || [];
+          const mediaArray = Array.isArray(model.exampleImages)
+            ? model.exampleImages
+            : [];
+
           if (mediaArray.length === 0) {
+            console.log(`  ❌ Has images filter: ${model.name} has no images`);
             return false;
           }
+        }
+
+        // BUGFIX #4: Missing filter
+        if (showMissingOnly && model._status !== "missing") {
+          return false;
+        }
+
+        // BUGFIX #4: Mismatch filter
+        if (showMismatchOnly && !model._hasMismatch) {
+          return false;
         }
 
         return true;
@@ -422,7 +550,9 @@ class ModelExplorer {
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
     console.log(`✅ Filtered to ${this.filteredModels.length} models`);
+    console.log("=== APPLY FILTERS END ===\n");
 
+    // BUGFIX #2: Ensure render happens after filtering
     this.renderModelGrid();
     this.updateModelCount();
   }
@@ -445,7 +575,6 @@ class ModelExplorer {
     this.filteredModels.forEach((model) => {
       const card = this.createModelCard(model);
       if (card) {
-        // Only add if card is not null (rating filter)
         grid.appendChild(card);
         visibleCount++;
       }
@@ -463,20 +592,21 @@ class ModelExplorer {
   }
 
   createModelCard(model) {
-    //console.log("\n🎴 === createModelCard CALLED ===");
-    //console.log("Model:", model.name);
-
     const isMissing = model._status === "missing";
+    const isMismatch = model._hasMismatch; // BUGFIX #4: Check mismatch flag
+
+    // BUGFIX #4: Add mismatch badge
     const missingBadge = isMissing
       ? '<div class="missing-badge">⚠️ MISSING</div>'
+      : "";
+    const mismatchBadge = isMismatch
+      ? '<div class="missing-badge" style="top: 42px;">🔀 MISMATCH</div>'
       : "";
 
     // Check if model should be shown based on content rating
     if (!this.canShowModel(model)) {
-      //console.log("  ❌ Model hidden by canShowModel()");
       return null;
     }
-    //console.log("  ✅ Model passed canShowModel()");
 
     const card = document.createElement("div");
     card.className = "model-card";
@@ -487,7 +617,6 @@ class ModelExplorer {
     }
 
     // Get appropriate media for current rating
-    //console.log("  Calling getAppropriateMedia()...");
     const appropriateMedia = this.getAppropriateMedia(model);
 
     let mediaHtml;
@@ -501,12 +630,11 @@ class ModelExplorer {
 
     // Add drop indicator for drag-drop
     const dropIndicator = `<div class="drop-indicator">📁</div>`;
-    //${missingBadge}
-    //${imageHtml}
+
     card.innerHTML = `
-            
             ${dropIndicator}
             ${missingBadge}
+            ${mismatchBadge}
             ${mediaHtml}
             <div class="model-info">
                 <div class="model-header">
@@ -547,18 +675,47 @@ class ModelExplorer {
 
   renderDetails(model) {
     const sidebar = document.getElementById("detailsSidebar");
-
-    // FIX: Define mediaArray from model.exampleImages
     const mediaArray = model.exampleImages || [];
+
+    // BUGFIX #3: Add delete button for missing models
+    const deleteButton =
+      model._status === "missing"
+        ? `<button class="btn btn-danger" onclick="app.deleteMissingModel('${this.escapeAttribute(
+            model.path
+          )}')">🗑️ Delete</button>`
+        : "";
+
+    // BUGFIX #4: Show mismatch warning if needed
+    const mismatchWarning = model._hasMismatch
+      ? `
+      <div class="missing-warning" style="border-color: #8be9fd; background: linear-gradient(135deg, rgba(139, 233, 253, 0.15), rgba(139, 233, 253, 0.05));">
+        <div class="warning-header" style="color: #8be9fd;">⚠️ Type/Base Mismatch Detected</div>
+        <p>This model has type or base model values that don't match the standard options:</p>
+        ${
+          model._typeMismatch
+            ? `<p><strong>Type:</strong> "${model.modelType}" is not a standard type</p>`
+            : ""
+        }
+        ${
+          model._baseMismatch
+            ? `<p><strong>Base:</strong> "${model.baseModel}" is not a standard base model</p>`
+            : ""
+        }
+        <p style="margin-top: 12px; font-size: 12px; color: #6272a4;">You may want to edit this model to use standard values for better filtering.</p>
+      </div>
+    `
+      : "";
 
     sidebar.innerHTML = `
             <div class="details-content">
+                ${mismatchWarning}
                 <div class="details-header">
                     <div class="details-title">${this.escapeHtml(
                       model.name || "Unnamed Model"
                     )}</div>
                     <div class="details-actions">
                         <button class="btn btn-primary" onclick="app.openEditModal()">✏️ Edit</button>
+                        ${deleteButton}
                         ${
                           model.civitaiUrl
                             ? `<a href="${model.civitaiUrl}" target="_blank" class="btn btn-secondary">🌐 CivitAI</a>`
@@ -623,7 +780,7 @@ class ModelExplorer {
 
                 <!-- Tags -->
                 ${
-                  model.tags && model.tags.length > 0
+                  Array.isArray(model.tags) && model.tags.length > 0
                     ? `
                 <div class="section">
                     <div class="section-header">
@@ -644,7 +801,7 @@ class ModelExplorer {
 
                 <!-- Trigger Words -->
                 ${
-                  model.triggerWords &&
+                  Array.isArray(model.triggerWords) &&
                   model.triggerWords.length > 0 &&
                   model.triggerWords[0] !== ""
                     ? `
@@ -689,7 +846,8 @@ class ModelExplorer {
 
                 <!-- Example Prompts -->
                 ${
-                  model.examplePrompts && model.examplePrompts.length > 0
+                  Array.isArray(model.examplePrompts) &&
+                  model.examplePrompts.length > 0
                     ? `
                 <div class="section">
                     <div class="section-header">
@@ -755,28 +913,6 @@ class ModelExplorer {
                 }
             </div>
         `;
-
-    const missingWarning =
-      model._status === "missing"
-        ? `
-  <div class="missing-warning">
-    <div class="warning-header">Model File Not Found</div>
-    <p>This model was in your database but wasn't found in the last filesystem scan.</p>
-    <p><strong>Last known location:</strong></p>
-    <div class="last-seen-path">${this.escapeHtml(
-      model._lastSeenPath || "Unknown"
-    )}</div>
-    <p>The model may have been moved, renamed, or deleted.</p>
-    <button class="btn btn-danger" onclick="app.deleteMissingModel('${this.escapeAttribute(
-      model.path
-    )}')">
-      🗑️ Remove from Database
-    </button>
-  </div>
-`
-        : "";
-
-    // Add ${missingWarning} at the start of the details-content
   }
 
   async deleteMissingModel(path) {
@@ -828,13 +964,12 @@ class ModelExplorer {
       return "";
     }
 
-    // Define which fields are relevant for each model type
     const fieldsByType = {
       checkpoint: ["resolution", "sampler", "steps", "cfg", "clipSkip"],
       lora: ["weight", "resolution", "steps", "cfg"],
       controlnet: ["preprocessor", "weight", "guidanceStart", "guidanceEnd"],
       upscaler: ["scale", "tileSize"],
-      vae: [], // VAE has no specific recommended settings typically
+      vae: [],
       embedding: ["weight"],
       hypernetwork: ["weight"],
     };
@@ -963,18 +1098,18 @@ class ModelExplorer {
 
                 <div class="form-group">
                     <label class="form-label">Tags (comma-separated)</label>
-                    <input type="text" class="form-input" name="tags" value="${(
-                      model.tags || []
-                    ).join(", ")}" placeholder="realistic, portrait, anime">
+                    <input type="text" class="form-input" name="tags" value="${
+                      Array.isArray(model.tags) ? model.tags.join(", ") : ""
+                    }" placeholder="realistic, portrait, anime">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Trigger Words (comma-separated)</label>
-                    <input type="text" class="form-input" name="triggerWords" value="${(
-                      model.triggerWords || []
-                    )
-                      .filter((w) => w !== "")
-                      .join(", ")}" placeholder="detailed, intricate">
+                    <input type="text" class="form-input" name="triggerWords" value="${
+                      Array.isArray(model.triggerWords)
+                        ? model.triggerWords.filter((w) => w !== "").join(", ")
+                        : ""
+                    }" placeholder="detailed, intricate">
                 </div>
 
                 <div class="form-group">
@@ -1019,21 +1154,25 @@ class ModelExplorer {
                 <div class="form-group">
                     <label class="form-label">Example Prompts</label>
                     <div id="promptsList">
-                        ${(model.examplePrompts || [])
-                          .map(
-                            (prompt, idx) => `
+                        ${
+                          Array.isArray(model.examplePrompts)
+                            ? model.examplePrompts
+                                .map(
+                                  (prompt, idx) => `
                             <div class="prompt-editor" data-idx="${idx}">
                                 <input type="text" class="form-input" placeholder="Prompt title" value="${this.escapeHtml(
                                   prompt.title
                                 )}" name="promptTitle_${idx}">
                                 <textarea class="form-textarea" placeholder="Prompt text" name="promptText_${idx}" style="margin-top: 8px; min-height: 60px;">${this.escapeHtml(
-                              prompt.prompt
-                            )}</textarea>
+                                    prompt.prompt
+                                  )}</textarea>
                                 <button type="button" class="btn-remove" onclick="app.removePrompt(${idx})">Remove</button>
                             </div>
                         `
-                          )
-                          .join("")}
+                                )
+                                .join("")
+                            : ""
+                        }
                     </div>
                     <button type="button" class="btn-add" onclick="app.addPrompt()">+ Add Prompt</button>
                 </div>
@@ -1092,7 +1231,7 @@ class ModelExplorer {
           .filter((t) => t)
       : [];
 
-    // Update recommended settings (only save non-empty values)
+    // Update recommended settings
     const fieldsByType = {
       checkpoint: ["resolution", "sampler", "steps", "cfg", "clipSkip"],
       lora: ["weight", "resolution", "steps", "cfg"],
@@ -1131,9 +1270,10 @@ class ModelExplorer {
 
     // Mark as dirty and save immediately
     this.isDirty = true;
-    this.autoSave(); // Save immediately on edit
+    this.autoSave();
 
     // Re-render
+    this.processModels(); // Re-process to update mismatch flags
     this.applyFilters();
     this.renderDetails(this.selectedModel);
     this.closeEditModal();
@@ -1183,6 +1323,9 @@ class ModelExplorer {
         const result = await response.json();
         const model = this.modelData.models[path];
         model.favorite = result.favorite;
+
+        // BUGFIX #2: Explicit re-process and re-filter
+        this.processModels();
         this.applyFilters();
 
         if (this.selectedModel?.path === path) {
@@ -1202,7 +1345,6 @@ class ModelExplorer {
     const lightboxCaption = document.getElementById("lightboxCaption");
     const lightboxControls = document.getElementById("lightboxControls");
 
-    // Find the media item and model
     let model = this.selectedModel;
     let actualModelPath = this.selectedModel?.path;
     if (modelPath) {
@@ -1210,7 +1352,6 @@ class ModelExplorer {
       actualModelPath = modelPath;
     }
 
-    // FIX: Define mediaArray from model.exampleImages
     const mediaArray = model?.exampleImages || [];
 
     if (!model || !mediaArray || mediaArray.length === 0) {
@@ -1225,7 +1366,7 @@ class ModelExplorer {
       return;
     }
 
-    // Render media (image or video)
+    // Render media
     const ext = imagePath.toLowerCase();
     const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
 
@@ -1297,10 +1438,8 @@ class ModelExplorer {
 
       if (response.ok) {
         this.showToast("✅ Rating updated!");
-        // Reload data to reflect changes
         await this.loadFromServer();
 
-        // Re-select the model if it was selected
         if (this.selectedModel?.path === modelPath) {
           this.selectedModel = this.modelData.models[modelPath];
           this.renderDetails(this.selectedModel);
@@ -1335,10 +1474,8 @@ class ModelExplorer {
         this.showToast("✅ Media deleted!");
         this.closeLightbox();
 
-        // Reload data to reflect changes
         await this.loadFromServer();
 
-        // Re-select the model if it was selected
         if (this.selectedModel?.path === modelPath) {
           this.selectedModel = this.modelData.models[modelPath];
           this.renderDetails(this.selectedModel);
@@ -1386,7 +1523,6 @@ class ModelExplorer {
   }
 
   showToast(message) {
-    // Simple toast notification
     const toast = document.createElement("div");
     toast.style.cssText = `
             position: fixed;
@@ -1426,7 +1562,6 @@ class ModelExplorer {
 
     this.isDirty = false;
 
-    // Update button to show no changes
     const exportBtn = document.getElementById("exportJsonBtn");
     exportBtn.textContent = "💾 Export JSON";
     exportBtn.title = "Export database to file";
@@ -1451,7 +1586,6 @@ class ModelExplorer {
         console.log("💾 Auto-saved to server");
         this.isDirty = false;
 
-        // Update button
         const exportBtn = document.getElementById("exportJsonBtn");
         exportBtn.textContent = "💾 Export JSON";
         exportBtn.title = "Export database to file";
@@ -1489,17 +1623,13 @@ class ModelExplorer {
     const previewStep = document.getElementById("previewStep");
     const confirmBtn = document.getElementById("confirmMergeBtn");
 
-    // Reset to upload step
     uploadStep.style.display = "block";
     previewStep.style.display = "none";
     confirmBtn.style.display = "none";
 
-    // Clear any pending merge
     this.pendingMerge = null;
-
     modal.style.display = "flex";
 
-    // Setup drag & drop (only once)
     if (!this.importDragDropSetup) {
       this.setupImportDragDrop();
       this.importDragDropSetup = true;
@@ -1510,7 +1640,6 @@ class ModelExplorer {
     document.getElementById("importModal").style.display = "none";
     this.pendingMerge = null;
 
-    // Clear file input
     const fileInput = document.getElementById("importFileInput");
     if (fileInput) fileInput.value = "";
   }
@@ -1519,7 +1648,6 @@ class ModelExplorer {
     const dropZone = document.getElementById("dropZone");
     const fileInput = document.getElementById("importFileInput");
 
-    // Prevent default drag behaviors
     ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
       dropZone.addEventListener(eventName, (e) => {
         e.preventDefault();
@@ -1527,7 +1655,6 @@ class ModelExplorer {
       });
     });
 
-    // Visual feedback
     ["dragenter", "dragover"].forEach((eventName) => {
       dropZone.addEventListener(eventName, () => {
         dropZone.classList.add("drag-active");
@@ -1540,7 +1667,6 @@ class ModelExplorer {
       });
     });
 
-    // Handle drop
     dropZone.addEventListener("drop", (e) => {
       const files = e.dataTransfer.files;
       if (files.length > 0) {
@@ -1548,14 +1674,12 @@ class ModelExplorer {
       }
     });
 
-    // Handle file input
     fileInput.addEventListener("change", (e) => {
       if (e.target.files.length > 0) {
         this.handleImportFile(e.target.files[0]);
       }
     });
 
-    // Click to browse
     dropZone.addEventListener("click", (e) => {
       if (e.target === dropZone || e.target.closest(".drop-zone-content")) {
         fileInput.click();
@@ -1572,18 +1696,14 @@ class ModelExplorer {
         return;
       }
 
-      // Show loading state
       const dropZone = document.getElementById("dropZone");
       dropZone.classList.add("loading");
 
-      // Read file
       const fileContent = await file.text();
       const newDb = JSON.parse(fileContent);
 
-      // Remove loading state
       dropZone.classList.remove("loading");
 
-      // Validate structure
       if (!newDb.models || typeof newDb.models !== "object") {
         this.showToast("❌ Invalid database format - missing models object");
         return;
@@ -1595,18 +1715,15 @@ class ModelExplorer {
         "models"
       );
 
-      // Perform merge analysis
       const mergeResult = this.analyzeMerge(this.modelData, newDb);
 
       console.log("📊 Merge analysis complete:", mergeResult.stats);
 
-      // Store for later
       this.pendingMerge = {
         newDb: newDb,
         analysis: mergeResult,
       };
 
-      // Show preview
       this.showMergePreview(mergeResult);
     } catch (error) {
       console.error("Failed to import file:", error);
@@ -1627,15 +1744,12 @@ class ModelExplorer {
       stats: { matched: 0, new: 0, missing: 0 },
     };
 
-    // Build hash index of old database
-    // Include both primary hash and variant hashes
     const oldByHash = new Map();
     const oldPaths = new Set();
 
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
       oldPaths.add(path);
 
-      // Add primary hash
       if (model.fileHash) {
         if (!oldByHash.has(model.fileHash)) {
           oldByHash.set(model.fileHash, []);
@@ -1643,7 +1757,6 @@ class ModelExplorer {
         oldByHash.get(model.fileHash).push({ path, model });
       }
 
-      // NEW: Add variant hashes
       if (model.variants) {
         if (model.variants.highHash) {
           if (!oldByHash.has(model.variants.highHash)) {
@@ -1664,7 +1777,6 @@ class ModelExplorer {
 
     const processedOldPaths = new Set();
 
-    // Process new database
     Object.entries(newDb.models || {}).forEach(([newPath, newModel]) => {
       const hash = newModel.fileHash;
 
@@ -1673,13 +1785,11 @@ class ModelExplorer {
         return;
       }
 
-      // Check primary hash
       let matched = false;
 
       if (oldByHash.has(hash)) {
-        // Found by primary hash
         const matches = oldByHash.get(hash);
-        const match = matches[0]; // Use first match
+        const match = matches[0];
         const { path: oldPath, model: oldModel } = match;
 
         result.matched.push({
@@ -1694,7 +1804,6 @@ class ModelExplorer {
         matched = true;
       }
 
-      // NEW: Check variant hashes
       if (!matched && newModel.variants) {
         if (
           newModel.variants.highHash &&
@@ -1738,7 +1847,6 @@ class ModelExplorer {
       }
 
       if (!matched) {
-        // NEW: Model only in new database
         result.new.push({
           hash,
           path: newPath,
@@ -1748,7 +1856,6 @@ class ModelExplorer {
       }
     });
 
-    // Identify missing models (in old but not in new)
     oldPaths.forEach((oldPath) => {
       if (!processedOldPaths.has(oldPath)) {
         const oldModel = oldDb.models[oldPath];
@@ -1771,12 +1878,10 @@ class ModelExplorer {
     const previewStep = document.getElementById("previewStep");
     const confirmBtn = document.getElementById("confirmMergeBtn");
 
-    // Switch to preview step
     uploadStep.style.display = "none";
     previewStep.style.display = "block";
     confirmBtn.style.display = "block";
 
-    // Update stats
     document.getElementById("matchedCount").textContent =
       analysis.stats.matched;
     document.getElementById("newCount").textContent = analysis.stats.new;
@@ -1789,12 +1894,10 @@ class ModelExplorer {
     document.getElementById("missingCountDetail").textContent =
       analysis.stats.missing;
 
-    // Populate detail lists
     this.populateMergeList("matchedList", analysis.matched, "matched");
     this.populateMergeList("newList", analysis.new, "new");
     this.populateMergeList("missingList", analysis.missing, "missing");
 
-    // Setup confirm button
     confirmBtn.onclick = () => this.executeMerge();
   }
 
@@ -1843,7 +1946,6 @@ class ModelExplorer {
 
       console.log("✅ Merge complete, saving...");
 
-      // Save merged database (will auto-backup)
       const response = await fetch("/api/models", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1856,7 +1958,6 @@ class ModelExplorer {
 
       console.log("💾 Merge saved successfully");
 
-      // Reload data from server
       await this.loadFromServer();
 
       this.showToast(
@@ -1877,13 +1978,11 @@ class ModelExplorer {
       models: {},
     };
 
-    // Build hash maps for quick lookup (including variant hashes)
     const oldByHash = new Map();
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
       if (model.fileHash) {
         oldByHash.set(model.fileHash, { path, model });
       }
-      // NEW: Map variant hashes too
       if (model.variants) {
         if (model.variants.highHash) {
           oldByHash.set(model.variants.highHash, { path, model });
@@ -1894,7 +1993,6 @@ class ModelExplorer {
       }
     });
 
-    // Process all models from new database
     Object.entries(newDb.models).forEach(([newPath, newModel]) => {
       const hash = newModel.fileHash;
 
@@ -1905,12 +2003,9 @@ class ModelExplorer {
 
       let oldModel = null;
 
-      // Check primary hash
       if (oldByHash.has(hash)) {
         oldModel = oldByHash.get(hash).model;
-      }
-      // NEW: Check variant hashes
-      else if (newModel.variants) {
+      } else if (newModel.variants) {
         if (
           newModel.variants.highHash &&
           oldByHash.has(newModel.variants.highHash)
@@ -1925,17 +2020,14 @@ class ModelExplorer {
       }
 
       if (oldModel) {
-        // MATCHED: Merge old and new data
         merged.models[newPath] = this.mergeModelData(oldModel, newModel);
         console.log("✅ Merged:", newPath);
       } else {
-        // NEW: Just add it
         merged.models[newPath] = newModel;
         console.log("➕ Added new:", newPath);
       }
     });
 
-    // Process missing models (mark but keep)
     analysis.missing.forEach((item) => {
       const oldModel = oldDb.models[item.path];
       if (oldModel) {
@@ -1961,7 +2053,6 @@ class ModelExplorer {
   mergeModelData(oldModel, newModel) {
     console.log("🔀 Merging model data...");
 
-    // Start with new model's filesystem data
     const merged = {
       name: newModel.name,
       modelType: newModel.modelType,
@@ -1972,15 +2063,12 @@ class ModelExplorer {
         newModel.fileSizeFormatted || oldModel.fileSizeFormatted || "",
     };
 
-    // NEW: Handle variants with dual hashes
     if (newModel.variants) {
       merged.variants = newModel.variants;
     } else if (oldModel.variants) {
       merged.variants = oldModel.variants;
     }
 
-    // Fields that should ALWAYS be preserved from old model (user-entered data)
-    // ONLY copy if old model has non-empty values
     const userFields = [
       "baseModel",
       "nsfw",
@@ -2001,7 +2089,6 @@ class ModelExplorer {
       const oldValue = oldModel[field];
       const newValue = newModel[field];
 
-      // Determine if old value has meaningful data
       let oldHasData = false;
 
       if (Array.isArray(oldValue)) {
@@ -2009,17 +2096,15 @@ class ModelExplorer {
       } else if (typeof oldValue === "object" && oldValue !== null) {
         oldHasData = Object.keys(oldValue).length > 0;
       } else if (typeof oldValue === "boolean") {
-        oldHasData = true; // Always preserve booleans
+        oldHasData = true;
       } else if (typeof oldValue === "string") {
         oldHasData = oldValue.trim() !== "";
       }
 
-      // If old has data, use it; otherwise check if new has data
       if (oldHasData) {
         merged[field] = oldValue;
         console.log(`  ✅ Preserved ${field} from old model`);
       } else if (newValue !== undefined && newValue !== null) {
-        // Only use new value if it's not explicitly empty
         let newHasData = false;
 
         if (Array.isArray(newValue)) {
@@ -2035,7 +2120,6 @@ class ModelExplorer {
         if (newHasData) {
           merged[field] = newValue;
         } else {
-          // Both are empty, use appropriate default
           if (Array.isArray(oldValue)) {
             merged[field] = [];
           } else if (typeof oldValue === "object" && oldValue !== null) {
@@ -2060,7 +2144,7 @@ class ModelExplorer {
       ? "Showing videos (click for images only)"
       : "Showing images only (click to include videos)";
 
-    // Re-render to apply changes
+    // BUGFIX #2: Explicit re-process and re-filter
     if (this.modelData) {
       this.processModels();
       this.applyFilters();
@@ -2077,7 +2161,6 @@ class ModelExplorer {
   }
 
   getModelMaxRating(model) {
-    // FIX: Define mediaArray from model.exampleImages
     const mediaArray = model.exampleImages || [];
 
     if (mediaArray.length === 0) {
@@ -2100,29 +2183,23 @@ class ModelExplorer {
   canShowModel(model) {
     const currentRatingValue = this.getRatingValue(this.contentRating);
 
-    // DEFENSIVE: Convert exampleImages to array if needed
     let mediaArray = model.exampleImages;
     if (!mediaArray || typeof mediaArray !== "object") {
       mediaArray = [];
     } else if (!Array.isArray(mediaArray)) {
-      // Convert object to array
       mediaArray = Object.values(mediaArray).filter(
         (item) => item && typeof item === "object"
       );
     }
 
-    // If model has no images
     if (mediaArray.length === 0) {
-      // NSFW models without images only show at X rating
       if (model.nsfw) {
         return currentRatingValue >= this.getRatingValue("x");
       }
-      return true; // Non-NSFW models with no images always show
+      return true;
     }
 
-    // Model has images - check if any are appropriate for current rating
     const hasAppropriateImage = mediaArray.some((img) => {
-      // DEFAULT RATING: If image has no rating, use X for NSFW models, PG for others
       const imgRating = img.rating || (model.nsfw ? "x" : "pg");
       return this.getRatingValue(imgRating) <= currentRatingValue;
     });
@@ -2131,21 +2208,12 @@ class ModelExplorer {
   }
 
   getAppropriateMedia(model) {
-    console.log("=== getAppropriateMedia CALLED ===");
-    console.log("Model name:", model.name);
-    console.log("Current content rating:", this.contentRating);
-    console.log("Show videos:", this.showVideos);
-
-    // DEFENSIVE: Handle both array and object formats during migration
     if (!model.exampleImages) {
-      console.log("  ❌ No exampleImages property");
       return null;
     }
 
-    // Convert object to array if needed (migration from old format)
     let mediaArray = model.exampleImages;
     if (!Array.isArray(mediaArray)) {
-      console.log("  ⚠️ exampleImages is not an array, converting...");
       if (typeof mediaArray === "object") {
         mediaArray = Object.values(mediaArray).filter(
           (item) => item && typeof item === "object"
@@ -2156,90 +2224,51 @@ class ModelExplorer {
     }
 
     if (mediaArray.length === 0) {
-      console.log("  ❌ No images found");
       return null;
     }
-
-    console.log("Total media items:", mediaArray.length);
 
     const currentRatingValue = this.getRatingValue(this.contentRating);
-    console.log("Current rating value:", currentRatingValue);
 
-    // Filter by rating first
     let appropriateMedia = mediaArray.filter((item) => {
       const itemRating = item.rating || "pg";
-      const passes = this.getRatingValue(itemRating) <= currentRatingValue;
-      console.log(
-        `  Check ${item.filename}: rating=${itemRating}, passes=${passes}`
-      );
-      return passes;
+      return this.getRatingValue(itemRating) <= currentRatingValue;
     });
 
-    console.log("After rating filter:", appropriateMedia.length, "items");
-
     if (appropriateMedia.length === 0) {
-      console.log("  ❌ No appropriate media found");
       return null;
     }
 
-    // If videos disabled, filter out videos
     if (!this.showVideos) {
       const imagesOnly = appropriateMedia.filter((item) => {
         const ext = (item.filename || "").toLowerCase();
         const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
-        console.log(
-          `    ${item.filename} is video: ${isVideo} - ${
-            isVideo ? "FILTERED OUT" : "KEPT"
-          }`
-        );
         return !isVideo;
       });
       appropriateMedia = imagesOnly.length > 0 ? imagesOnly : appropriateMedia;
-      console.log("After video filter:", appropriateMedia.length, "items");
     }
 
-    // NEW SORTING LOGIC: Prioritize videos when showVideos is true
     appropriateMedia.sort((a, b) => {
       const extA = (a.filename || "").toLowerCase();
       const extB = (b.filename || "").toLowerCase();
       const isVideoA = extA.endsWith(".mp4") || extA.endsWith(".webm");
       const isVideoB = extB.endsWith(".mp4") || extB.endsWith(".webm");
 
-      // If showVideos is true, prefer videos over images
       if (this.showVideos) {
         if (isVideoA && !isVideoB) {
-          console.log(
-            `  Sorting: ${a.filename} (video) > ${b.filename} (image)`
-          );
-          return -1; // a comes first (video preferred)
+          return -1;
         }
         if (!isVideoA && isVideoB) {
-          console.log(
-            `  Sorting: ${b.filename} (video) > ${a.filename} (image)`
-          );
-          return 1; // b comes first (video preferred)
+          return 1;
         }
       }
 
-      // If both are same type (both videos or both images), sort by rating
       const ratingA = a.rating || "pg";
       const ratingB = b.rating || "pg";
       const valA = this.getRatingValue(ratingA);
       const valB = this.getRatingValue(ratingB);
 
-      console.log(
-        `  Sorting by rating: ${a.filename}(${valA}) vs ${b.filename}(${valB})`
-      );
-      return valB - valA; // Higher rating first
+      return valB - valA;
     });
-
-    console.log(
-      "✅ Selected media:",
-      appropriateMedia[0]?.filename,
-      "Rating:",
-      appropriateMedia[0]?.rating
-    );
-    console.log("=== END getAppropriateMedia ===\n");
 
     return appropriateMedia[0];
   }
@@ -2250,10 +2279,7 @@ class ModelExplorer {
     const isVideo = ext === "mp4" || ext === "webm";
 
     if (isVideo && this.showVideos) {
-      // Determine video MIME type
       const mimeType = ext === "mp4" ? "video/mp4" : "video/webm";
-
-      // Generate unique ID for this video
       const videoId = `video_${Math.random().toString(36).substr(2, 9)}`;
 
       return `
@@ -2274,7 +2300,6 @@ class ModelExplorer {
       </video>
     `;
     } else if (isVideo && !this.showVideos) {
-      // Video exists but videos are disabled - show placeholder
       return `<div class="model-placeholder">🎬</div>`;
     } else {
       return `<img 
@@ -2290,7 +2315,6 @@ class ModelExplorer {
     const settings = model.recommendedSettings || {};
     const modelType = model.modelType || "checkpoint";
 
-    // Define fields per model type
     const fieldDefinitions = {
       checkpoint: [
         { key: "resolution", placeholder: "Resolution (e.g., 512x768)" },
@@ -2387,7 +2411,6 @@ class ModelExplorer {
   setupDragDrop() {
     const grid = document.getElementById("modelGrid");
 
-    // Prevent default drag behaviors
     ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
       grid.addEventListener(eventName, (e) => {
         e.preventDefault();
@@ -2395,7 +2418,6 @@ class ModelExplorer {
       });
     });
 
-    // Add drag-over visual feedback
     grid.addEventListener("dragover", (e) => {
       const card = e.target.closest(".model-card");
       if (card) {
@@ -2410,9 +2432,7 @@ class ModelExplorer {
       }
     });
 
-    // Handle file drop
     grid.addEventListener("drop", async (e) => {
-      // Remove drag-over class from all cards
       document.querySelectorAll(".model-card.drag-over").forEach((card) => {
         card.classList.remove("drag-over");
       });
@@ -2437,7 +2457,6 @@ class ModelExplorer {
         return;
       }
 
-      // Find which card was dropped on
       const card = e.target.closest(".model-card");
       if (!card) {
         this.showToast("❌ Drop file on a model card");
@@ -2455,7 +2474,6 @@ class ModelExplorer {
     try {
       this.showToast("⏳ Uploading...");
 
-      // Upload file to server
       const formData = new FormData();
       formData.append("file", file);
       formData.append("modelPath", modelPath);
@@ -2469,14 +2487,12 @@ class ModelExplorer {
 
       const result = await response.json();
 
-      // Show rating dialog
       const rating = await this.promptForRating();
       if (!rating) {
         this.showToast("❌ Upload cancelled");
         return;
       }
 
-      // Update model with new media
       const updateResponse = await fetch(
         `/api/models/${encodeURIComponent(modelPath)}/add-media`,
         {
@@ -2492,9 +2508,8 @@ class ModelExplorer {
 
       if (updateResponse.ok) {
         this.showToast("✅ Media added successfully!");
-        await this.loadFromServer(); // Reload data
+        await this.loadFromServer();
 
-        // Re-select the model if it was selected
         if (this.selectedModel?.path === modelPath) {
           this.selectedModel = this.modelData.models[modelPath];
           this.renderDetails(this.selectedModel);
@@ -2547,5 +2562,4 @@ class ModelExplorer {
 // Initialize app
 const app = new ModelExplorer();
 
-// App will auto-load from server in init()
 console.log("🎨 Model Explorer initialized in Flask server mode");
