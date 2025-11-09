@@ -410,10 +410,7 @@ class ModelExplorer {
         }
 
         // Has images filter
-        if (
-          hasImagesOnly &&
-          (!model.exampleImages || model.exampleImages.length === 0)
-        ) {
+        if (hasImagesOnly && (!mediaArray || mediaArray.length === 0)) {
           return false;
         }
 
@@ -714,14 +711,14 @@ class ModelExplorer {
 
                 <!-- Example Images -->
                 ${
-                  model.exampleImages && model.exampleImages.length > 0
+                  mediaArray && mediaArray.length > 0
                     ? `
                 <div class="section">
                     <div class="section-header">
                         <div class="section-title">🖼️ Example Images</div>
                     </div>
                     <div class="image-gallery">
-                        ${model.exampleImages
+                        ${mediaArray
                           .filter((img) => {
                             const imgRating =
                               img.rating || (model.nsfw ? "x" : "pg");
@@ -1207,14 +1204,12 @@ class ModelExplorer {
       actualModelPath = modelPath;
     }
 
-    if (!model || !model.exampleImages) {
+    if (!model || !mediaArray) {
       console.error("Model or images not found");
       return;
     }
 
-    const mediaItem = model.exampleImages.find(
-      (img) => img.filename === imagePath
-    );
+    const mediaItem = mediaArray.find((img) => img.filename === imagePath);
 
     if (!mediaItem) {
       console.error("Media item not found:", imagePath);
@@ -2073,16 +2068,16 @@ class ModelExplorer {
   }
 
   getModelMaxRating(model) {
-    if (!model.exampleImages || model.exampleImages.length === 0) {
+    if (!mediaArray || mediaArray.length === 0) {
       return "pg";
     }
 
-    const hasPgImage = model.exampleImages.some((img) => {
+    const hasPgImage = mediaArray.some((img) => {
       const rating = img.rating || "pg";
       return rating === "pg";
     });
-    const hasRImage = model.exampleImages.some((img) => img.rating === "r");
-    const hasXImage = model.exampleImages.some((img) => img.rating === "x");
+    const hasRImage = mediaArray.some((img) => img.rating === "r");
+    const hasXImage = mediaArray.some((img) => img.rating === "x");
 
     if (hasPgImage) return "pg";
     if (hasRImage) return "r";
@@ -2093,8 +2088,19 @@ class ModelExplorer {
   canShowModel(model) {
     const currentRatingValue = this.getRatingValue(this.contentRating);
 
+    // DEFENSIVE: Convert exampleImages to array if needed
+    let mediaArray = model.exampleImages;
+    if (!mediaArray || typeof mediaArray !== "object") {
+      mediaArray = [];
+    } else if (!Array.isArray(mediaArray)) {
+      // Convert object to array
+      mediaArray = Object.values(mediaArray).filter(
+        (item) => item && typeof item === "object"
+      );
+    }
+
     // If model has no images
-    if (!model.exampleImages || model.exampleImages.length === 0) {
+    if (mediaArray.length === 0) {
       // NSFW models without images only show at X rating
       if (model.nsfw) {
         return currentRatingValue >= this.getRatingValue("x");
@@ -2103,7 +2109,7 @@ class ModelExplorer {
     }
 
     // Model has images - check if any are appropriate for current rating
-    const hasAppropriateImage = model.exampleImages.some((img) => {
+    const hasAppropriateImage = mediaArray.some((img) => {
       // DEFAULT RATING: If image has no rating, use X for NSFW models, PG for others
       const imgRating = img.rating || (model.nsfw ? "x" : "pg");
       return this.getRatingValue(imgRating) <= currentRatingValue;
@@ -2120,18 +2126,38 @@ class ModelExplorer {
     console.log("Current content rating:", this.contentRating);
     console.log("Show videos:", this.showVideos);
 
-    if (!model.exampleImages || model.exampleImages.length === 0) {
+    // DEFENSIVE: Handle both array and object formats during migration
+    if (!model.exampleImages) {
+      // ✅ Check model.exampleImages, not mediaArray
+      console.log("  ❌ No exampleImages property");
+      return null;
+    }
+
+    // Convert object to array if needed (migration from old format)
+    let mediaArray = model.exampleImages; // ✅ Initialize from model.exampleImages
+    if (!Array.isArray(mediaArray)) {
+      console.log("  ⚠️ exampleImages is not an array, converting...");
+      if (typeof mediaArray === "object") {
+        mediaArray = Object.values(mediaArray).filter(
+          (item) => item && typeof item === "object"
+        );
+      } else {
+        mediaArray = [];
+      }
+    }
+
+    if (mediaArray.length === 0) {
       console.log("  ❌ No images found");
       return null;
     }
 
-    console.log("Total media items:", model.exampleImages.length);
+    console.log("Total media items:", mediaArray.length);
 
     const currentRatingValue = this.getRatingValue(this.contentRating);
     console.log("Current rating value:", currentRatingValue);
 
     // Filter by rating first
-    let appropriateMedia = model.exampleImages.filter((item) => {
+    let appropriateMedia = mediaArray.filter((item) => {
       const itemRating = item.rating || "pg";
       const passes = this.getRatingValue(itemRating) <= currentRatingValue;
       console.log(
