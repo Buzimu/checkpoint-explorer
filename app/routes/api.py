@@ -4,6 +4,7 @@ API routes for model data operations
 from flask import Blueprint, jsonify, request
 from app.services.database import load_db, save_db
 from app.services.media import save_uploaded_file
+from app.services.civitai import get_civitai_service
 import subprocess
 
 bp = Blueprint('api', __name__)
@@ -31,16 +32,103 @@ def update_all_models():
 
 @bp.route('/models/<path:model_path>', methods=['PUT'])
 def update_model(model_path):
-    """Update a specific model"""
+    """
+    Update a specific model
+    If CivitAI URL changed, automatically scrape for new data
+    """
     try:
         db = load_db()
-        if model_path in db['models']:
-            db['models'][model_path] = request.json
-            if save_db(db):
-                return jsonify({'success': True, 'model': db['models'][model_path]})
-            else:
-                return jsonify({'success': False, 'error': 'Failed to save'}), 500
-        return jsonify({'success': False, 'error': 'Model not found'}), 404
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        # Get old model data
+        old_model = db['models'][model_path]
+        old_url = old_model.get('civitaiUrl', '')
+        
+        # Get new model data
+        new_model = request.json
+        new_url = new_model.get('civitaiUrl', '')
+        
+        # Check if CivitAI URL changed
+        url_changed = old_url != new_url and new_url
+        
+        scrape_result = None
+        
+        # If URL changed, try to scrape
+        if url_changed:
+            print(f"🔍 CivitAI URL changed for {model_path}, auto-scraping...")
+            try:
+                service = get_civitai_service()
+                
+                # Check rate limit
+                if not service.can_scrape():
+                    print("⏳ Rate limit in effect, skipping auto-scrape")
+                    scrape_result = {
+                        'scraped': False,
+                        'error': 'Rate limit - wait 15 seconds between scrapes'
+                    }
+                else:
+                    # Scrape the page
+                    model_name = new_model.get('name', 'Unknown')
+                    scraped_data = service.scrape_model_page(new_url, model_name)
+                    
+                    # Extract IDs
+                    ids = service.extract_ids_from_url(new_url)
+                    new_model['civitaiModelId'] = ids['modelId']
+                    new_model['civitaiVersionId'] = ids['versionId']
+                    
+                    # Store scraped data
+                    new_model['civitaiData'] = scraped_data
+                    
+                    # Determine what to auto-fill
+                    auto_filled = {
+                        'tags': [],
+                        'triggerWords': []
+                    }
+                    
+                    # Auto-fill tags if empty
+                    if not new_model.get('tags') or len(new_model['tags']) == 0:
+                        new_model['tags'] = scraped_data.get('tags', [])
+                        auto_filled['tags'] = new_model['tags']
+                    
+                    # Auto-fill trigger words if empty
+                    if not new_model.get('triggerWords') or len(new_model['triggerWords']) == 0:
+                        new_model['triggerWords'] = scraped_data.get('trainedWords', [])
+                        auto_filled['triggerWords'] = new_model['triggerWords']
+                    
+                    scrape_result = {
+                        'scraped': True,
+                        'data': scraped_data,
+                        'autoFilled': auto_filled
+                    }
+                    
+                    print(f"✅ Auto-scrape successful for {model_path}")
+                    
+            except Exception as scrape_error:
+                print(f"⚠️ Auto-scrape failed: {scrape_error}")
+                scrape_result = {
+                    'scraped': False,
+                    'error': str(scrape_error)
+                }
+        
+        # Update the model
+        db['models'][model_path] = new_model
+        
+        # Save database
+        if save_db(db):
+            response = {
+                'success': True,
+                'model': db['models'][model_path]
+            }
+            
+            # Include scrape result if available
+            if scrape_result:
+                response['scrapeResult'] = scrape_result
+            
+            return jsonify(response)
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save'}), 500
+            
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -237,10 +325,32 @@ def trigger_scan():
         }), 500
 
 
+@bp.route('/activity-log', methods=['GET'])
+def get_activity_log():
+    """
+    Get recent activity from the CivitAI scraping service
+    """
+    try:
+        service = get_civitai_service()
+        activities = service.get_activity_log()
+        
+        return jsonify({
+            'success': True,
+            'activities': activities,
+            'count': len(activities)
+        })
+    except Exception as e:
+        print(f"❌ Failed to get activity log: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @bp.route('/models/<path:model_path>/scrape-civitai', methods=['POST'])
 def scrape_civitai(model_path):
     """
-    Scrape CivitAI page for model metadata
+    Manually trigger CivitAI scrape for a model
     """
     try:
         db = load_db()
@@ -253,11 +363,19 @@ def scrape_civitai(model_path):
         if not civitai_url:
             return jsonify({'success': False, 'error': 'No CivitAI URL set'}), 400
         
-        # Scrape the page
-        from app.services.civitai import CivitAIService
-        service = CivitAIService()
+        # Get service
+        service = get_civitai_service()
         
-        scraped_data = service.scrape_model_page(civitai_url)
+        # Check rate limit
+        if not service.can_scrape():
+            return jsonify({
+                'success': False,
+                'error': 'Rate limit in effect - please wait 15 seconds between scrapes'
+            }), 429
+        
+        # Scrape the page
+        model_name = model.get('name', 'Unknown')
+        scraped_data = service.scrape_model_page(civitai_url, model_name)
         
         # Extract IDs
         ids = service.extract_ids_from_url(civitai_url)
@@ -267,27 +385,106 @@ def scrape_civitai(model_path):
         # Store scraped data
         model['civitaiData'] = scraped_data
         
+        # Determine what to auto-fill
+        auto_filled = {
+            'tags': [],
+            'triggerWords': []
+        }
+        
         # Auto-fill tags if empty
         if not model.get('tags') or len(model['tags']) == 0:
             model['tags'] = scraped_data.get('tags', [])
+            auto_filled['tags'] = model['tags']
         
         # Auto-fill trigger words if empty
         if not model.get('triggerWords') or len(model['triggerWords']) == 0:
             model['triggerWords'] = scraped_data.get('trainedWords', [])
+            auto_filled['triggerWords'] = model['triggerWords']
         
         # Save
         if save_db(db):
             return jsonify({
                 'success': True,
                 'data': scraped_data,
-                'autoFilled': {
-                    'tags': model.get('tags'),
-                    'triggerWords': model.get('triggerWords')
-                }
+                'autoFilled': auto_filled
             })
         
         return jsonify({'success': False, 'error': 'Failed to save'}), 500
         
     except Exception as e:
         print(f"❌ CivitAI scrape failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/models/<path:model_path>/skip-version', methods=['POST'])
+def skip_version(model_path):
+    """Mark a CivitAI version as skipped"""
+    try:
+        db = load_db()
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        model = db['models'][model_path]
+        data = request.json
+        version_id = data.get('versionId')
+        
+        if not version_id:
+            return jsonify({'success': False, 'error': 'Missing versionId'}), 400
+        
+        # Initialize skipped versions list if needed
+        if 'skippedVersions' not in model:
+            model['skippedVersions'] = []
+        
+        # Add to skipped list if not already there
+        if version_id not in model['skippedVersions']:
+            model['skippedVersions'].append(version_id)
+        
+        # Update version status in civitaiData if present
+        if 'civitaiData' in model and 'versions' in model['civitaiData']:
+            for version in model['civitaiData']['versions']:
+                if version.get('versionId') == version_id:
+                    version['status'] = 'skipped'
+        
+        if save_db(db):
+            return jsonify({'success': True})
+        
+        return jsonify({'success': False, 'error': 'Failed to save'}), 500
+        
+    except Exception as e:
+        print(f"❌ Skip version failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/models/<path:model_path>/unskip-version', methods=['POST'])
+def unskip_version(model_path):
+    """Remove a version from the skipped list"""
+    try:
+        db = load_db()
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        model = db['models'][model_path]
+        data = request.json
+        version_id = data.get('versionId')
+        
+        if not version_id:
+            return jsonify({'success': False, 'error': 'Missing versionId'}), 400
+        
+        # Remove from skipped list if present
+        if 'skippedVersions' in model and version_id in model['skippedVersions']:
+            model['skippedVersions'].remove(version_id)
+        
+        # Update version status in civitaiData if present
+        if 'civitaiData' in model and 'versions' in model['civitaiData']:
+            for version in model['civitaiData']['versions']:
+                if version.get('versionId') == version_id:
+                    version['status'] = 'available'
+        
+        if save_db(db):
+            return jsonify({'success': True})
+        
+        return jsonify({'success': False, 'error': 'Failed to save'}), 500
+        
+    except Exception as e:
+        print(f"❌ Unskip version failed: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
