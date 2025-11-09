@@ -27,6 +27,11 @@ if __name__ == '__main__':
     
     print("\n🚀 Starting server on http://localhost:5000")
     print("Press Ctrl+C to stop\n")
+
+    from app.services.background_scraper import get_background_scraper
+
+    scraper = get_background_scraper()
+    scraper.start()
     
     # Run the app
     app.run(**FLASK_CONFIG)
