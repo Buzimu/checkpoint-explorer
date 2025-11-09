@@ -63,6 +63,20 @@ class ModelExplorer {
     this.init();
   }
 
+  async loadActivityLog() {
+    try {
+      const response = await fetch("/api/activity-log");
+      if (!response.ok) return;
+
+      const result = await response.json();
+      if (result.success) {
+        this.updateActivityButton(result.activities);
+      }
+    } catch (error) {
+      console.error("Failed to load activity log:", error);
+    }
+  }
+
   init() {
     // Setup event listeners
     document.getElementById("loadJsonBtn").addEventListener("click", () => {
@@ -179,6 +193,51 @@ class ModelExplorer {
 
     // Auto-load from server
     this.loadFromServer();
+
+    // Start activity log polling
+    setInterval(() => {
+      this.loadActivityLog();
+    }, 30000); // Update every 30 seconds
+
+    // Load immediately
+    this.loadActivityLog();
+  }
+
+  updateActivityButton(activities) {
+    const btn = document.getElementById("activityBtn");
+    if (!btn) return;
+
+    // Update tooltip with activities
+    let tooltip = '<div class="activity-log-tooltip">';
+    tooltip += '<div class="activity-log-header">Recent Activity</div>';
+
+    if (activities.length === 0) {
+      tooltip += '<div class="activity-log-empty">No recent activity</div>';
+    } else {
+      activities.forEach((activity) => {
+        const time = new Date(activity.timestamp).toLocaleTimeString();
+        const icon = activity.status === "success" ? "✅" : "❌";
+        const statusClass = activity.status === "success" ? "success" : "error";
+
+        tooltip += `
+        <div class="activity-log-item ${statusClass}">
+          <div class="activity-log-time">${time}</div>
+          <div class="activity-log-content">
+            ${icon} ${activity.action}: ${activity.modelName}
+            ${
+              activity.details
+                ? `<div class="activity-log-details">${activity.details}</div>`
+                : ""
+            }
+          </div>
+        </div>
+      `;
+      });
+    }
+
+    tooltip += "</div>";
+
+    btn.setAttribute("data-tooltip", tooltip);
   }
 
   resetFiltersToDefaults() {
@@ -778,6 +837,133 @@ class ModelExplorer {
                     </div>
                 </div>
 
+                <!-- File Info -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">📁 File Info</div>
+  </div>
+  <div class="info-grid">
+    <div class="info-item">
+      <span class="info-label">File Size</span>
+      <span class="info-value">${model.fileSizeFormatted || "Unknown"}</span>
+    </div>
+    ${
+      model.fileHash
+        ? `
+    <div class="info-item">
+      <span class="info-label">File Hash</span>
+      <span class="info-value" style="font-size: 10px; font-family: monospace;">${model.fileHash}</span>
+    </div>
+    `
+        : ""
+    }
+    ${
+      model.civitaiVersionId
+        ? `
+    <div class="info-item">
+      <span class="info-label">CivitAI Version</span>
+      <span class="info-value">${model.civitaiVersionId}</span>
+    </div>
+    `
+        : ""
+    }
+  </div>
+</div>
+
+<!-- Versions Section -->
+${
+  model.civitaiData?.availableVersions &&
+  model.civitaiData.availableVersions.length > 0
+    ? `
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">📦 Available Versions</div>
+  </div>
+  <div class="version-list">
+    ${model.civitaiData.availableVersions
+      .map((version) => {
+        let badge = "";
+        let actions = "";
+
+        if (version.status === "owned") {
+          badge = '<span class="version-badge owned">✅ Installed</span>';
+        } else if (version.status === "available") {
+          badge = '<span class="version-badge available">🆕 Available</span>';
+          actions = `
+          <button class="btn-mini" onclick="window.open('https://civitai.com/models/${
+            model.civitaiModelId
+          }?modelVersionId=${
+            version.versionId
+          }', '_blank')">⬇️ Download</button>
+          <button class="btn-mini" onclick="app.skipVersion('${this.escapeAttribute(
+            model.path
+          )}', '${version.versionId}')">⏭️ Skip</button>
+        `;
+        } else if (version.status === "skipped") {
+          badge = '<span class="version-badge skipped">⏭️ Skipped</span>';
+          actions = `
+          <button class="btn-mini" onclick="app.unskipVersion('${this.escapeAttribute(
+            model.path
+          )}', '${version.versionId}')">↩️ Unskip</button>
+        `;
+        }
+
+        return `
+        <div class="version-item">
+          <div class="version-info">
+            <span class="version-name">${this.escapeHtml(
+              version.name || "Unknown"
+            )}</span>
+            <span class="version-base">${version.baseModel || "Unknown"}</span>
+            ${badge}
+          </div>
+          <div class="version-actions">
+            ${actions}
+          </div>
+        </div>
+      `;
+      })
+      .join("")}
+  </div>
+</div>
+`
+    : ""
+}
+
+<!-- Related Versions -->
+${
+  model.relatedVersions && model.relatedVersions.length > 0
+    ? `
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">🔗 Related Versions</div>
+  </div>
+  <div class="related-versions-list">
+    ${model.relatedVersions
+      .map((relPath) => {
+        const relModel = this.modelData.models[relPath];
+        if (!relModel) return "";
+
+        return `
+        <div class="related-version-item" onclick="app.selectModel(${JSON.stringify(
+          { path: relPath, ...relModel }
+        )})">
+          <span class="related-version-name">${this.escapeHtml(
+            relModel.name
+          )}</span>
+          <span class="related-version-base">${
+            relModel.baseModel || "Unknown"
+          }</span>
+        </div>
+      `;
+      })
+      .join("")}
+  </div>
+</div>
+`
+    : ""
+}
+
                 <!-- Tags -->
                 ${
                   Array.isArray(model.tags) && model.tags.length > 0
@@ -1184,21 +1370,25 @@ class ModelExplorer {
             </form>
         `;
 
-    // Form submit handler
+    // Form submit handler - bind this context properly
+    const self = this;
     document.getElementById("editForm").addEventListener("submit", (e) => {
       e.preventDefault();
-      this.saveModelEdits();
+      self.saveModelEdits();
     });
 
     modal.style.display = "flex";
   }
 
-  saveModelEdits() {
+  async saveModelEdits() {
     const form = document.getElementById("editForm");
     const formData = new FormData(form);
 
     // Get the model from modelData
     const model = this.modelData.models[this.selectedModel.path];
+
+    // Store old URL to detect changes
+    const oldUrl = model.civitaiUrl || "";
 
     // Update basic fields
     model.name = formData.get("name");
@@ -1268,17 +1458,57 @@ class ModelExplorer {
     // Update selectedModel reference
     this.selectedModel = { path: this.selectedModel.path, ...model };
 
-    // Mark as dirty and save immediately
-    this.isDirty = true;
-    this.autoSave();
+    // Save to server (which will auto-scrape if URL changed)
+    try {
+      const response = await fetch(
+        `/api/models/${encodeURIComponent(this.selectedModel.path)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(model),
+        }
+      );
 
-    // Re-render
-    this.processModels(); // Re-process to update mismatch flags
-    this.applyFilters();
-    this.renderDetails(this.selectedModel);
-    this.closeEditModal();
+      if (response.ok) {
+        const result = await response.json();
 
-    console.log("✅ Model updated:", model.name);
+        // Check if scraping happened
+        if (result.scrapeResult) {
+          if (result.scrapeResult.scraped) {
+            let message = "✅ Model saved & CivitAI data fetched!";
+            const autoFilled = result.scrapeResult.autoFilled;
+
+            if (autoFilled.tags && autoFilled.tags.length > 0) {
+              message += `\n📋 Auto-filled ${autoFilled.tags.length} tags`;
+            }
+            if (autoFilled.triggerWords && autoFilled.triggerWords.length > 0) {
+              message += `\n✨ Auto-filled ${autoFilled.triggerWords.length} trigger words`;
+            }
+
+            this.showToast(message);
+          } else if (result.scrapeResult.error) {
+            this.showToast("⚠️ Model saved but CivitAI scrape failed");
+          }
+        } else {
+          this.showToast("✅ Model saved");
+        }
+
+        // Reload activity log
+        await this.loadActivityLog();
+
+        // Reload to get updated data
+        await this.loadFromServer();
+
+        // Update view
+        this.processModels();
+        this.applyFilters();
+        this.renderDetails(this.selectedModel);
+        this.closeEditModal();
+      }
+    } catch (error) {
+      console.error("Failed to save model:", error);
+      this.showToast("❌ Failed to save model");
+    }
   }
 
   addPrompt() {
@@ -1595,6 +1825,58 @@ class ModelExplorer {
     } catch (error) {
       console.warn("Auto-save failed:", error);
       this.showToast("⚠️ Auto-save failed - check server connection");
+    }
+  }
+
+  async skipVersion(modelPath, versionId) {
+    try {
+      const response = await fetch(
+        `/api/models/${encodeURIComponent(modelPath)}/skip-version`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ versionId }),
+        }
+      );
+
+      if (response.ok) {
+        this.showToast("⏭️ Version skipped");
+        await this.loadFromServer();
+
+        if (this.selectedModel?.path === modelPath) {
+          this.selectedModel = this.modelData.models[modelPath];
+          this.renderDetails(this.selectedModel);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to skip version:", error);
+      this.showToast("❌ Failed to skip version");
+    }
+  }
+
+  async unskipVersion(modelPath, versionId) {
+    try {
+      const response = await fetch(
+        `/api/models/${encodeURIComponent(modelPath)}/unskip-version`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ versionId }),
+        }
+      );
+
+      if (response.ok) {
+        this.showToast("↩️ Version unskipped");
+        await this.loadFromServer();
+
+        if (this.selectedModel?.path === modelPath) {
+          this.selectedModel = this.modelData.models[modelPath];
+          this.renderDetails(this.selectedModel);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to unskip version:", error);
+      this.showToast("❌ Failed to unskip version");
     }
   }
 

@@ -235,3 +235,59 @@ def trigger_scan():
             'success': False,
             'error': str(e)
         }), 500
+
+
+@bp.route('/models/<path:model_path>/scrape-civitai', methods=['POST'])
+def scrape_civitai(model_path):
+    """
+    Scrape CivitAI page for model metadata
+    """
+    try:
+        db = load_db()
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        model = db['models'][model_path]
+        civitai_url = model.get('civitaiUrl')
+        
+        if not civitai_url:
+            return jsonify({'success': False, 'error': 'No CivitAI URL set'}), 400
+        
+        # Scrape the page
+        from app.services.civitai import CivitAIService
+        service = CivitAIService()
+        
+        scraped_data = service.scrape_model_page(civitai_url)
+        
+        # Extract IDs
+        ids = service.extract_ids_from_url(civitai_url)
+        model['civitaiModelId'] = ids['modelId']
+        model['civitaiVersionId'] = ids['versionId']
+        
+        # Store scraped data
+        model['civitaiData'] = scraped_data
+        
+        # Auto-fill tags if empty
+        if not model.get('tags') or len(model['tags']) == 0:
+            model['tags'] = scraped_data.get('tags', [])
+        
+        # Auto-fill trigger words if empty
+        if not model.get('triggerWords') or len(model['triggerWords']) == 0:
+            model['triggerWords'] = scraped_data.get('trainedWords', [])
+        
+        # Save
+        if save_db(db):
+            return jsonify({
+                'success': True,
+                'data': scraped_data,
+                'autoFilled': {
+                    'tags': model.get('tags'),
+                    'triggerWords': model.get('triggerWords')
+                }
+            })
+        
+        return jsonify({'success': False, 'error': 'Failed to save'}), 500
+        
+    except Exception as e:
+        print(f"❌ CivitAI scrape failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
