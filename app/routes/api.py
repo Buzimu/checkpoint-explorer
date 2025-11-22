@@ -181,25 +181,6 @@ def upload_media():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-def _ensure_example_images_list(model):
-    """
-    Ensure exampleImages is a list, converting from dict if necessary.
-    Returns the list (also modifies model in-place).
-    """
-    existing = model.get('exampleImages')
-    
-    if existing is None:
-        model['exampleImages'] = []
-    elif isinstance(existing, dict):
-        # Convert dict to list of values (preserving the media objects)
-        model['exampleImages'] = [v for v in existing.values() if isinstance(v, dict)]
-    elif not isinstance(existing, list):
-        # Any other unexpected type, reset to empty list
-        model['exampleImages'] = []
-    
-    return model['exampleImages']
-
-
 @bp.route('/models/<path:model_path>/add-media', methods=['POST'])
 def add_media_to_model(model_path):
     """Add uploaded media to model's exampleImages"""
@@ -213,10 +194,10 @@ def add_media_to_model(model_path):
         rating = data.get('rating', 'pg')
         caption = data.get('caption', '')
         
-        # Ensure exampleImages is a list (might be missing, None, or a dict)
-        _ensure_example_images_list(db['models'][model_path])
+        # Add to exampleImages
+        if 'exampleImages' not in db['models'][model_path]:
+            db['models'][model_path]['exampleImages'] = []
         
-        # Now safely append
         db['models'][model_path]['exampleImages'].append({
             'filename': filename,
             'rating': rating,
@@ -249,12 +230,12 @@ def update_media_rating(model_path):
         if not filename or not new_rating:
             return jsonify({'success': False, 'error': 'Missing parameters'}), 400
         
-        # Ensure exampleImages is a list
-        media_list = _ensure_example_images_list(db['models'][model_path])
+        # Find and update the media item
+        media_list = db['models'][model_path].get('exampleImages', [])
         updated = False
         
         for media in media_list:
-            if isinstance(media, dict) and media.get('filename') == filename:
+            if media['filename'] == filename:
                 media['rating'] = new_rating
                 updated = True
                 break
@@ -287,13 +268,13 @@ def delete_media(model_path):
         if not filename:
             return jsonify({'success': False, 'error': 'Missing filename'}), 400
         
-        # Ensure exampleImages is a list
-        media_list = _ensure_example_images_list(db['models'][model_path])
+        # Remove from exampleImages
+        media_list = db['models'][model_path].get('exampleImages', [])
         original_length = len(media_list)
         
         db['models'][model_path]['exampleImages'] = [
             media for media in media_list 
-            if isinstance(media, dict) and media.get('filename') != filename
+            if media['filename'] != filename
         ]
         
         if len(db['models'][model_path]['exampleImages']) == original_length:
