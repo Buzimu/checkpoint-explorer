@@ -2030,6 +2030,14 @@ ${
     const oldPaths = new Set();
 
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
+      // BUGFIX: Skip already-missing models - they're either staying missing or user deleted them
+      if (path.startsWith("_missing/")) {
+        console.log(
+          `⏭️  Skipping already-missing entry during analysis: ${path}`
+        );
+        return;
+      }
+
       oldPaths.add(path);
 
       if (model.fileHash) {
@@ -2055,7 +2063,11 @@ ${
       }
     });
 
-    console.log("📚 Old database:", oldPaths.size, "models indexed");
+    console.log(
+      "📚 Old database:",
+      oldPaths.size,
+      "non-missing models indexed"
+    );
 
     const processedOldPaths = new Set();
 
@@ -2261,7 +2273,21 @@ ${
     };
 
     const oldByHash = new Map();
+
+    // BUGFIX: Track which paths were already marked as missing
+    const alreadyMissingPaths = new Set();
+
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
+      // Track already-missing entries so we don't re-add them
+      if (path.startsWith("_missing/")) {
+        alreadyMissingPaths.add(path);
+        alreadyMissingPaths.add(
+          model._lastSeenPath || path.replace(/^_missing\//, "")
+        );
+        console.log(`📝 Tracking deleted missing model: ${path}`);
+        return; // Don't index missing entries for matching
+      }
+
       if (model.fileHash) {
         oldByHash.set(model.fileHash, { path, model });
       }
@@ -2275,6 +2301,7 @@ ${
       }
     });
 
+    // Process new models (matched and new)
     Object.entries(newDb.models).forEach(([newPath, newModel]) => {
       const hash = newModel.fileHash;
 
@@ -2310,7 +2337,19 @@ ${
       }
     });
 
+    // Process missing models - but ONLY if they weren't already missing
     analysis.missing.forEach((item) => {
+      // BUGFIX: Skip if this was already marked as missing (user deleted it)
+      if (
+        alreadyMissingPaths.has(item.path) ||
+        alreadyMissingPaths.has(`_missing/${item.path}`)
+      ) {
+        console.log(
+          `⏭️  Skipping previously deleted missing model: ${item.path}`
+        );
+        return;
+      }
+
       const oldModel = oldDb.models[item.path];
       if (oldModel) {
         const missingKey = `_missing/${item.path}`;
@@ -2319,16 +2358,13 @@ ${
           _status: "missing",
           _lastSeenPath: item.path,
         };
-        console.log("⚠️ Marked as missing:", item.path);
+        console.log("⚠️ Newly marked as missing:", missingKey);
       }
     });
 
     console.log(
-      "✅ Merge complete:",
-      Object.keys(merged.models).length,
-      "total models"
+      `✅ Merge complete: ${Object.keys(merged.models).length} total models`
     );
-
     return merged;
   }
 
