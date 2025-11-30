@@ -9,6 +9,7 @@ class ModelExplorer {
     this.serverMode = true;
     this.showVideos = false;
     this.pendingMerge = null;
+    this.activeVersions = {}; // Track active version index per model path
 
     // NEW: Default filter configuration
     this.DEFAULT_FILTERS = {
@@ -201,6 +202,48 @@ class ModelExplorer {
 
     // Load immediately
     this.loadActivityLog();
+  }
+
+  // Get stack count for visual stacking (max 4)
+  getStackCount(versionCount) {
+    if (versionCount <= 1) return 0;
+    return Math.min(versionCount - 1, 4);
+  }
+
+  // Get all versions for a model (main + related)
+  getAllVersions(model) {
+    const versions = [{ path: model.path, ...model }];
+
+    if (model.relatedVersions && Array.isArray(model.relatedVersions)) {
+      model.relatedVersions.forEach((relPath) => {
+        const relModel = this.modelData.models[relPath];
+        if (relModel) {
+          versions.push({ path: relPath, ...relModel });
+        }
+      });
+    }
+
+    return versions;
+  }
+
+  // Get active version for a model
+  getActiveVersion(model) {
+    const versions = this.getAllVersions(model);
+    const activeIdx = this.activeVersions[model.path] || 0;
+    return versions[activeIdx] || versions[0];
+  }
+
+  // Set active version for a model
+  setActiveVersion(modelPath, versionIdx) {
+    this.activeVersions[modelPath] = versionIdx;
+    this.renderModelGrid();
+
+    // Update details if this model is selected
+    if (this.selectedModel && this.selectedModel.path === modelPath) {
+      const versions = this.getAllVersions(this.selectedModel);
+      this.selectedModel = versions[versionIdx];
+      this.renderDetails(this.selectedModel);
+    }
   }
 
   updateActivityButton(activities) {
@@ -652,21 +695,48 @@ class ModelExplorer {
 
   createModelCard(model) {
     const isMissing = model._status === "missing";
-    const isMismatch = model._hasMismatch; // BUGFIX #4: Check mismatch flag
+    const isMismatch = model._hasMismatch;
 
-    // BUGFIX #4: Add mismatch badge
-    const missingBadge = isMissing
-      ? '<div class="missing-badge">⚠️ MISSING</div>'
-      : "";
-    const mismatchBadge = isMismatch
-      ? '<div class="missing-badge" style="top: 42px;">🔀 MISMATCH</div>'
-      : "";
-
-    // Check if model should be shown based on content rating
     if (!this.canShowModel(model)) {
       return null;
     }
 
+    // Get all versions (main model + related versions)
+    const versions = this.getAllVersions(model);
+    const stackCount = this.getStackCount(versions.length);
+    const activeVersionIdx = this.activeVersions[model.path] || 0;
+    const activeVersion = versions[activeVersionIdx];
+
+    // Create wrapper for stacking
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText =
+      "position: relative; width: 100%; overflow: visible;";
+
+    // Create stacked cards behind
+    for (let i = 0; i < stackCount; i++) {
+      const stackCard = document.createElement("div");
+      const offset = (i + 1) * 10;
+      const opacity = 0.8 - i * 0.1;
+      const zIndex = stackCount - i;
+
+      stackCard.style.cssText = `
+        position: absolute;
+        top: ${offset}px;
+        left: ${offset}px;
+        right: -${offset}px;
+        bottom: -${offset}px;
+        background: rgba(40, 42, 54, 0.95);
+        border: 2px solid rgba(68, 71, 90, 0.8);
+        border-radius: 12px;
+        opacity: ${opacity};
+        z-index: ${zIndex};
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        pointer-events: none;
+      `;
+      wrapper.appendChild(stackCard);
+    }
+
+    // Create main card
     const card = document.createElement("div");
     card.className = "model-card";
     card.dataset.modelPath = model.path;
@@ -675,55 +745,156 @@ class ModelExplorer {
       card.classList.add("selected");
     }
 
-    // Get appropriate media for current rating
-    const appropriateMedia = this.getAppropriateMedia(model);
+    card.style.cssText = `
+      background: rgba(40, 42, 54, 0.95);
+      border: ${
+        this.selectedModel?.path === model.path
+          ? "2px solid #ff79c6"
+          : "2px solid #44475a"
+      };
+      border-radius: 12px;
+      overflow: visible;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      width: 100%;
+      min-height: 380px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: ${
+        this.selectedModel?.path === model.path
+          ? "0 0 0 3px rgba(255, 121, 198, 0.2), 0 12px 40px rgba(0, 0, 0, 0.4)"
+          : "0 8px 20px rgba(0, 0, 0, 0.3)"
+      };
+      z-index: 100;
+    `;
 
+    // Badges
+    const missingBadge = isMissing
+      ? '<div class="missing-badge">⚠️ MISSING</div>'
+      : "";
+    const mismatchBadge = isMismatch
+      ? '<div class="missing-badge" style="top: 42px;">🔀 MISMATCH</div>'
+      : "";
+
+    // Version selector (tabs)
+    let versionSelector = "";
+    if (versions.length > 1) {
+      versionSelector = `
+        <div class="version-selector" style="
+          padding: 12px 12px 8px 12px;
+          border-bottom: 1px solid #44475a;
+          background: rgba(68, 71, 90, 0.4);
+          backdrop-filter: blur(10px);
+          position: relative;
+          z-index: 200;
+        ">
+          <div class="version-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+            ${versions
+              .map(
+                (v, idx) => `
+              <button
+                class="version-tab ${idx === activeVersionIdx ? "active" : ""}"
+                data-model-path="${this.escapeAttribute(model.path)}"
+                data-version-idx="${idx}"
+                style="
+                  padding: 6px 10px;
+                  background: ${
+                    idx === activeVersionIdx
+                      ? "linear-gradient(135deg, #bd93f9, #ff79c6)"
+                      : "rgba(68, 71, 90, 0.6)"
+                  };
+                  border: ${
+                    idx === activeVersionIdx ? "none" : "1px solid #6272a4"
+                  };
+                  border-radius: 6px;
+                  color: #f8f8f2;
+                  font-size: 11px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+                  display: flex;
+                  align-items: center;
+                  gap: 4px;
+                  white-space: nowrap;
+                "
+              >
+                ${v.favorite ? '<span style="font-size: 10px;">⭐</span>' : ""}
+                ${this.escapeHtml(v.name || "Version " + (idx + 1))}
+              </button>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    // Get appropriate media for active version
+    const appropriateMedia = this.getAppropriateMedia(activeVersion);
     let mediaHtml;
 
     if (appropriateMedia) {
-      mediaHtml = this.renderMediaElement(appropriateMedia, model.name);
+      mediaHtml = this.renderMediaElement(appropriateMedia, activeVersion.name);
     } else {
-      const icon = this.getModelTypeIcon(model.modelType);
+      const icon = this.getModelTypeIcon(activeVersion.modelType);
       mediaHtml = `<div class="model-placeholder">${icon}</div>`;
     }
 
-    // Add drop indicator for drag-drop
+    // Wrap media in container with z-index control
+    const mediaContainer = `
+      <div style="position: relative; z-index: 1; overflow: hidden; border-radius: 0;">
+        ${mediaHtml}
+      </div>
+    `;
+
+    // Drop indicator for drag-drop
     const dropIndicator = `<div class="drop-indicator">📁</div>`;
 
     card.innerHTML = `
-            ${dropIndicator}
-            ${missingBadge}
-            ${mismatchBadge}
-            ${mediaHtml}
-            <div class="model-info">
-                <div class="model-header">
-                    <div class="model-name">${this.escapeHtml(
-                      model.name || "Unnamed Model"
-                    )}</div>
-                    <div class="favorite-icon" onclick="event.stopPropagation(); app.toggleFavorite('${this.escapeAttribute(
-                      model.path
-                    )}')">
-                        ${model.favorite ? "⭐" : "☆"}
-                    </div>
-                </div>
-                <div class="model-meta">
-                    <div class="model-type">${
-                      model.modelType || "Unknown"
-                    }</div>
-                    ${
-                      model.baseModel
-                        ? `<div class="model-base">${model.baseModel}</div>`
-                        : ""
-                    }
-                </div>
-            </div>
-        `;
+      ${dropIndicator}
+      ${missingBadge}
+      ${mismatchBadge}
+      ${versionSelector}
+      ${mediaContainer}
+      <div class="model-info">
+        <div class="model-header">
+          <div class="model-name">${this.escapeHtml(
+            activeVersion.name || "Unnamed Model"
+          )}</div>
+          <div class="favorite-icon" onclick="event.stopPropagation(); app.toggleFavorite('${this.escapeAttribute(
+            activeVersion.path
+          )}')">
+            ${activeVersion.favorite ? "⭐" : "☆"}
+          </div>
+        </div>
+        <div class="model-meta">
+          <div class="model-type">${activeVersion.modelType || "Unknown"}</div>
+          ${
+            activeVersion.baseModel
+              ? `<div class="model-base">${activeVersion.baseModel}</div>`
+              : ""
+          }
+        </div>
+      </div>
+    `;
 
-    card.addEventListener("click", () => {
-      this.selectModel(model);
+    // Add version tab click handlers
+    card.querySelectorAll(".version-tab").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const modelPath = btn.dataset.modelPath;
+        const versionIdx = parseInt(btn.dataset.versionIdx);
+        this.setActiveVersion(modelPath, versionIdx);
+      });
     });
 
-    return card;
+    card.addEventListener("click", () => {
+      this.selectModel(activeVersion);
+    });
+
+    wrapper.appendChild(card);
+    return wrapper;
   }
 
   selectModel(model) {
