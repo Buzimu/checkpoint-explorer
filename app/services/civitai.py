@@ -1,6 +1,6 @@
 """
 CivitAI integration service for model metadata scraping and version management
-FIXED VERSION - Properly parses Next.js JSON data structure
+UPDATED VERSION - Extracts file sizes for version matching
 """
 import re
 import requests
@@ -80,6 +80,7 @@ class CivitAIService:
         Scrape CivitAI model page for metadata
         
         Uses Next.js __NEXT_DATA__ JSON structure (Nov 2024)
+        NOW INCLUDES: File sizes for version matching
         """
         try:
             # Wait for rate limit
@@ -243,18 +244,43 @@ class CivitAIService:
     def _extract_versions(self, model_data):
         """
         Extract version information from model data
-        Each version has: id, name, status, trainedWords
+        Each version has: id, name, status, trainedWords, files (with sizes), baseModel
+        
+        NEW: Extracts file sizes for version matching!
         """
         versions = []
         model_versions = model_data.get('modelVersions', [])
         
         for version in model_versions:
+            # Extract file information (for version matching)
+            files = []
+            for file in version.get('files', []):
+                # Get file size (may be in KB or bytes)
+                size_kb = file.get('sizeKB', 0)
+                
+                # Some files have metadata with size info
+                if size_kb == 0 and 'metadata' in file:
+                    metadata = file['metadata']
+                    if 'size' in metadata:
+                        # Convert bytes to KB
+                        size_kb = metadata['size'] / 1024
+                
+                file_info = {
+                    'name': file.get('name', 'Unknown'),
+                    'sizeKB': size_kb,
+                    'type': file.get('type', 'Model'),
+                    'format': file.get('metadata', {}).get('format', 'Unknown')
+                }
+                files.append(file_info)
+            
             version_info = {
                 'id': str(version.get('id', '')),
                 'name': version.get('name', 'Unknown'),
                 'status': version.get('status', 'Unknown'),
                 'trainedWords': version.get('trainedWords', []),
-                'available': version.get('status') == 'Published'
+                'available': version.get('status') == 'Published',
+                'files': files,  # NEW: File size info for matching
+                'baseModel': version.get('baseModel', 'Unknown')  # NEW: Base model info
             }
             versions.append(version_info)
         
