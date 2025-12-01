@@ -109,6 +109,10 @@ class ModelExplorer {
       this.toggleVideoMode();
     });
 
+    document.getElementById("linkVersionsBtn").addEventListener("click", () => {
+      this.triggerVersionLinking();
+    });
+
     // Search and filter listeners - BUGFIX #2: Ensure filters apply immediately
     document.getElementById("searchInput").addEventListener("input", () => {
       console.log("🔍 Search input changed");
@@ -204,6 +208,108 @@ class ModelExplorer {
     this.loadActivityLog();
   }
 
+  getLinkType(mainPath, relatedPath) {
+    /**
+     * Get the link type between two models
+     * Returns: 'confirmed', 'assumed', or null
+     */
+    const mainModel = this.modelData?.models?.[mainPath];
+    if (!mainModel) return null;
+
+    const linkMetadata = mainModel.linkMetadata || {};
+    const metadata = linkMetadata[relatedPath];
+
+    if (!metadata) return null;
+
+    return metadata.type; // 'confirmed' or 'assumed'
+  }
+
+  getLinkTypeTooltip(linkType, versionName) {
+    /**
+     * Get tooltip text for link type
+     */
+    if (linkType === "confirmed") {
+      return `✅ Confirmed: ${versionName} (Both have CivitAI links)`;
+    } else if (linkType === "assumed") {
+      return `🔍 Assumed: ${versionName} (Matched by file size - add CivitAI link to confirm)`;
+    } else {
+      return versionName;
+    }
+  }
+
+  // Add this method to the ModelExplorer class
+
+  async triggerVersionLinking() {
+    try {
+      this.showToast("⏳ Analyzing models and linking versions...");
+
+      const response = await fetch("/api/link-versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          methods: ["civitai", "filesize"], // Use both methods
+          tolerance: 0.05, // 5% file size tolerance
+          force: false, // Don't overwrite existing links
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        console.log("🔗 Version Linking Results:", result);
+
+        // Show detailed toast
+        let message = `✅ Version Linking Complete!\n`;
+        message += `\n📊 Stats:`;
+        message += `\n  • ${result.stats.linkedGroups} groups found`;
+        message += `\n  • ${result.stats.modelsWithVersions} models now have versions`;
+        message += `\n  • ${result.stats.unlinkedModels} models remain unlinked`;
+
+        this.showToast(message);
+
+        // Log groups for debugging
+        if (result.groups && result.groups.length > 0) {
+          console.log("\n📋 Linked Groups:");
+          result.groups.forEach((group, idx) => {
+            console.log(`\n${idx + 1}. ${group.name}`);
+            console.log(`   Method: ${group.method}`);
+            console.log(`   Versions: ${group.versions}`);
+            console.log(`   Models:`, group.models);
+          });
+        }
+
+        // Reload database to show stacked cards
+        await this.loadFromServer();
+      } else {
+        const error = await response.json();
+        this.showToast(
+          `❌ Version linking failed: ${error.error || "Unknown error"}`
+        );
+      }
+    } catch (error) {
+      console.error("Version linking failed:", error);
+      this.showToast("❌ Version linking failed: " + error.message);
+    }
+  }
+
+  // =====================================
+  // HTML BUTTON TO ADD TO index.html
+  // =====================================
+
+  /*
+Add this button to the header-right section in index.html:
+
+<button class="btn btn-secondary" id="linkVersionsBtn" title="Link related model versions">
+  🔗 Link Versions
+</button>
+
+Then add this listener in the init() method:
+
+document.getElementById('linkVersionsBtn').addEventListener('click', () => {
+  this.triggerVersionLinking();
+});
+*/
+
   // Get stack count for visual stacking (max 4)
   getStackCount(versionCount) {
     if (versionCount <= 1) return 0;
@@ -238,11 +344,16 @@ class ModelExplorer {
     this.activeVersions[modelPath] = versionIdx;
     this.renderModelGrid();
 
-    // Update details if this model is selected
+    // FIX: Update sidebar if this model is selected
     if (this.selectedModel && this.selectedModel.path === modelPath) {
       const versions = this.getAllVersions(this.selectedModel);
-      this.selectedModel = versions[versionIdx];
-      this.renderDetails(this.selectedModel);
+      const newActiveVersion = versions[versionIdx];
+
+      // Update selected model reference
+      this.selectedModel = newActiveVersion;
+
+      // Re-render details panel
+      this.renderDetails(newActiveVersion);
     }
   }
 
@@ -781,53 +892,68 @@ class ModelExplorer {
     let versionSelector = "";
     if (versions.length > 1) {
       versionSelector = `
-        <div class="version-selector" style="
-          padding: 12px 12px 8px 12px;
-          border-bottom: 1px solid #44475a;
-          background: rgba(68, 71, 90, 0.4);
-          backdrop-filter: blur(10px);
-          position: relative;
-          z-index: 200;
-        ">
-          <div class="version-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-            ${versions
-              .map(
-                (v, idx) => `
-              <button
-                class="version-tab ${idx === activeVersionIdx ? "active" : ""}"
-                data-model-path="${this.escapeAttribute(model.path)}"
-                data-version-idx="${idx}"
-                style="
-                  padding: 6px 10px;
-                  background: ${
-                    idx === activeVersionIdx
-                      ? "linear-gradient(135deg, #bd93f9, #ff79c6)"
-                      : "rgba(68, 71, 90, 0.6)"
-                  };
-                  border: ${
-                    idx === activeVersionIdx ? "none" : "1px solid #6272a4"
-                  };
-                  border-radius: 6px;
-                  color: #f8f8f2;
-                  font-size: 11px;
-                  font-weight: 600;
-                  cursor: pointer;
-                  transition: all 0.2s ease;
-                  display: flex;
-                  align-items: center;
-                  gap: 4px;
-                  white-space: nowrap;
-                "
-              >
-                ${v.favorite ? '<span style="font-size: 10px;">⭐</span>' : ""}
-                ${this.escapeHtml(v.name || "Version " + (idx + 1))}
-              </button>
-            `
-              )
-              .join("")}
-          </div>
-        </div>
-      `;
+  <div class="version-selector" style="
+    padding: 12px 12px 8px 12px;
+    border-bottom: 1px solid #44475a;
+    background: rgba(68, 71, 90, 0.4);
+    backdrop-filter: blur(10px);
+    position: relative;
+    z-index: 200;
+  ">
+    <div class="version-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+      ${versions
+        .map((v, idx) => {
+          // Check link type for this version
+          const linkType = this.getLinkType(model.path, v.path);
+          const linkIndicator =
+            linkType === "confirmed"
+              ? "✅"
+              : linkType === "assumed"
+              ? "🔍"
+              : "";
+
+          return `
+          <button
+            class="version-tab ${idx === activeVersionIdx ? "active" : ""}"
+            data-model-path="${this.escapeAttribute(model.path)}"
+            data-version-idx="${idx}"
+            title="${this.getLinkTypeTooltip(linkType, v.name)}"
+            style="
+              padding: 6px 10px;
+              background: ${
+                idx === activeVersionIdx
+                  ? "linear-gradient(135deg, #bd93f9, #ff79c6)"
+                  : "rgba(68, 71, 90, 0.6)"
+              };
+              border: ${
+                idx === activeVersionIdx ? "none" : "1px solid #6272a4"
+              };
+              border-radius: 6px;
+              color: #f8f8f2;
+              font-size: 11px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              white-space: nowrap;
+            "
+          >
+            ${
+              linkIndicator
+                ? `<span style="font-size: 9px;">${linkIndicator}</span>`
+                : ""
+            }
+            ${v.favorite ? '<span style="font-size: 10px;">⭐</span>' : ""}
+            ${this.escapeHtml(v.name || "Version " + (idx + 1))}
+          </button>
+        `;
+        })
+        .join("")}
+    </div>
+  </div>
+`;
     }
 
     // Get appropriate media for active version
@@ -1134,7 +1260,84 @@ ${
 `
     : ""
 }
+${
+  model.relatedVersions && model.relatedVersions.length > 0
+    ? `
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">🔗 Version Links</div>
+  </div>
+  <div class="version-link-list">
+    ${model.relatedVersions
+      .map((relPath) => {
+        const relModel = this.modelData.models[relPath];
+        if (!relModel) return "";
 
+        const linkMeta = model.linkMetadata?.[relPath] || {};
+        const linkType = linkMeta.type || "unknown";
+        const isConfirmed = linkType === "confirmed";
+        const isAssumed = linkType === "assumed";
+
+        return `
+        <div class="version-link-item ${linkType}" style="
+          padding: 12px;
+          background: rgba(68, 71, 90, 0.3);
+          border-left: 3px solid ${
+            isConfirmed ? "#50fa7b" : isAssumed ? "#8be9fd" : "#6272a4"
+          };
+          border-radius: 6px;
+          margin-bottom: 8px;
+          cursor: pointer;
+        " onclick="app.selectModel(${JSON.stringify({
+          path: relPath,
+          ...relModel,
+        })})">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span style="font-size: 16px;">${
+              isConfirmed ? "✅" : isAssumed ? "🔍" : "🔗"
+            }</span>
+            <span style="font-weight: 600; color: #f8f8f2; font-size: 13px;">
+              ${this.escapeHtml(relModel.name)}
+            </span>
+          </div>
+          <div style="font-size: 11px; color: #6272a4; margin-left: 24px;">
+            ${
+              isConfirmed
+                ? "✅ Confirmed link (both have CivitAI data)"
+                : isAssumed
+                ? `🔍 Assumed link (matched by file size: ${linkMeta.sizeDiff?.toFixed(
+                    2
+                  )}% diff)`
+                : "🔗 Linked"
+            }
+          </div>
+          ${
+            isAssumed
+              ? `
+            <div style="font-size: 11px; color: #ffb86c; margin-left: 24px; margin-top: 4px;">
+              💡 Add CivitAI link to confirm this relationship
+            </div>
+          `
+              : ""
+          }
+          ${
+            linkMeta.versionName
+              ? `
+            <div style="font-size: 11px; color: #bd93f9; margin-left: 24px; margin-top: 4px;">
+              CivitAI Version: ${this.escapeHtml(linkMeta.versionName)}
+            </div>
+          `
+              : ""
+          }
+        </div>
+      `;
+      })
+      .join("")}
+  </div>
+</div>
+`
+    : ""
+}
                 <!-- Tags -->
                 ${
                   Array.isArray(model.tags) && model.tags.length > 0
@@ -1644,23 +1847,27 @@ ${
         const result = await response.json();
 
         // Check if scraping happened
-        if (result.scrapeResult) {
-          if (result.scrapeResult.scraped) {
-            let message = "✅ Model saved & CivitAI data fetched!";
-            const autoFilled = result.scrapeResult.autoFilled;
+        if (result.versionLinking) {
+          const linking = result.versionLinking;
+          let message = "✅ Model saved & CivitAI data fetched!";
 
-            if (autoFilled.tags && autoFilled.tags.length > 0) {
-              message += `\n📋 Auto-filled ${autoFilled.tags.length} tags`;
-            }
-            if (autoFilled.triggerWords && autoFilled.triggerWords.length > 0) {
-              message += `\n✨ Auto-filled ${autoFilled.triggerWords.length} trigger words`;
-            }
-
-            this.showToast(message);
-          } else if (result.scrapeResult.error) {
-            this.showToast("⚠️ Model saved but CivitAI scrape failed");
+          if (linking.stats.confirmed > 0) {
+            message += `\n✅ ${linking.stats.confirmed} confirmed version link(s)`;
           }
+          if (linking.stats.assumed > 0) {
+            message += `\n🔍 ${linking.stats.assumed} assumed version link(s)`;
+          }
+
+          if (autoFilled.tags && autoFilled.tags.length > 0) {
+            message += `\n📋 Auto-filled ${autoFilled.tags.length} tags`;
+          }
+          if (autoFilled.triggerWords && autoFilled.triggerWords.length > 0) {
+            message += `\n✨ Auto-filled ${autoFilled.triggerWords.length} trigger words`;
+          }
+
+          this.showToast(message);
         } else {
+          // Original message if no linking
           this.showToast("✅ Model saved");
         }
 

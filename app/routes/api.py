@@ -351,6 +351,7 @@ def get_activity_log():
 def scrape_civitai(model_path):
     """
     Manually trigger CivitAI scrape for a model
+    NOW WITH AUTO VERSION LINKING
     """
     try:
         db = load_db()
@@ -401,18 +402,33 @@ def scrape_civitai(model_path):
             model['triggerWords'] = scraped_data.get('trainedWords', [])
             auto_filled['triggerWords'] = model['triggerWords']
         
+        # ====================================================================
+        # NEW: AUTO-LINK RELATED VERSIONS
+        # ====================================================================
+        from app.services.civitai_version_linking import link_versions_from_civitai_scrape
+        
+        linking_result = link_versions_from_civitai_scrape(model_path, scraped_data)
+        
         # Save
         if save_db(db):
-            return jsonify({
+            response = {
                 'success': True,
                 'data': scraped_data,
                 'autoFilled': auto_filled
-            })
+            }
+            
+            # Include linking results
+            if linking_result:
+                response['versionLinking'] = linking_result
+            
+            return jsonify(response)
         
         return jsonify({'success': False, 'error': 'Failed to save'}), 500
         
     except Exception as e:
         print(f"❌ CivitAI scrape failed: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -454,7 +470,84 @@ def skip_version(model_path):
         print(f"❌ Skip version failed: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+"""
+Version Linking API Endpoint
+Add this to app/routes/api.py after the unskip_version endpoint
+"""
 
+@bp.route('/link-versions', methods=['POST'])
+def link_versions():
+    """
+    Link related model versions together based on CivitAI IDs and file sizes
+    
+    Request body (optional):
+    {
+        "methods": ["civitai", "filesize", "name"],  // Which methods to use
+        "tolerance": 0.05,                           // File size tolerance (default 5%)
+        "force": false                               // Overwrite existing links
+    }
+    """
+    try:
+        from app.services.version_linker import get_version_linker
+        
+        # Get request parameters
+        data = request.json or {}
+        methods = data.get('methods', ['civitai', 'filesize'])
+        tolerance = data.get('tolerance', 0.05)
+        force = data.get('force', False)
+        
+        print(f"\n🔗 === VERSION LINKING START ===")
+        print(f"Methods: {methods}")
+        print(f"Tolerance: {tolerance * 100}%")
+        print(f"Force: {force}")
+        
+        # Load database
+        db = load_db()
+        
+        # If not forcing, preserve existing links
+        if not force:
+            print("📋 Preserving existing relatedVersions links...")
+            existing_links = 0
+            for model in db['models'].values():
+                if model.get('relatedVersions'):
+                    existing_links += 1
+            print(f"   Found {existing_links} models with existing links")
+        
+        # Create linker
+        linker = get_version_linker(tolerance=tolerance)
+        
+        # Link versions
+        models, stats, groups_info = linker.link_all(db['models'], methods=methods)
+        
+        # Update database
+        db['models'] = models
+        
+        # Save
+        if save_db(db):
+            print("✅ Database saved successfully")
+            print(f"=== VERSION LINKING COMPLETE ===\n")
+            
+            return jsonify({
+                'success': True,
+                'stats': stats,
+                'groups': groups_info
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to save database'
+            }), 500
+    
+    except Exception as e:
+        print(f"❌ Version linking failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+        
 @bp.route('/models/<path:model_path>/unskip-version', methods=['POST'])
 def unskip_version(model_path):
     """Remove a version from the skipped list"""
