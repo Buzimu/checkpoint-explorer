@@ -40,6 +40,12 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
         print("   No versions found in scraped data")
         return {'confirmed': [], 'assumed': [], 'stats': {}}
     
+    if model_id:
+        clean_conflicting_links(db, model_path, model_id)
+        save_db(db)  # Save after cleanup
+        db = load_db()  # Reload fresh copy
+        current_model = db['models'][model_path]
+    
     print(f"   Found {len(versions)} versions in CivitAI data")
     
     # Track matches
@@ -87,7 +93,13 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
             continue
         
         # TIER 2: Search for ASSUMED match (file size within ±1%)
-        assumed_match = find_assumed_match(db, version_sizes, exclude_path=model_path, tolerance=0.01)
+        assumed_match = find_assumed_match(
+            db, 
+            version_sizes, 
+            exclude_path=model_path, 
+            tolerance=0.01,
+            current_model_id=model_id  # NEW: Pass current model's ID to prevent cross-family matches
+        )
         
         if assumed_match:
             match_path = assumed_match['path']
@@ -155,7 +167,7 @@ def find_confirmed_match(db, model_id, version_id):
     return None
 
 
-def find_assumed_match(db, target_sizes, exclude_path=None, tolerance=0.01):
+def find_assumed_match(db, target_sizes, exclude_path=None, tolerance=0.01, current_model_id=None):
     """
     Find a model that matches by file size (within tolerance)
     This is an ASSUMED match - we think they're related but not confirmed
@@ -164,6 +176,7 @@ def find_assumed_match(db, target_sizes, exclude_path=None, tolerance=0.01):
         target_sizes: List of possible file sizes from CivitAI
         exclude_path: Path to exclude (ourselves)
         tolerance: Size difference tolerance (default 1%)
+        current_model_id: Current model's CivitAI Model ID (to avoid cross-family matches)
     """
     best_match = None
     best_diff = float('inf')
@@ -173,9 +186,19 @@ def find_assumed_match(db, target_sizes, exclude_path=None, tolerance=0.01):
         if path.startswith('_missing/') or path == exclude_path:
             continue
         
-        # Skip models that already have CivitAI links
-        # (those should be confirmed matches, not assumed)
-        if model.get('civitaiModelId'):
+        # CRITICAL BUGFIX: If this model has a DIFFERENT CivitAI Model ID,
+        # they are confirmed to be from different families - NEVER match them
+        other_model_id = model.get('civitaiModelId')
+        if other_model_id and current_model_id:
+            if str(other_model_id) != str(current_model_id):
+                # Confirmed different families - skip this model entirely
+                continue
+        
+        # Skip models that already have CivitAI links to the SAME family
+        # (those should have been found by confirmed match, not assumed)
+        if other_model_id and current_model_id and str(other_model_id) == str(current_model_id):
+            # Same family - should have been confirmed match
+            # Skip to avoid duplicate linking
             continue
         
         # Get model's file size
@@ -315,6 +338,82 @@ def upgrade_assumed_to_confirmed(db, path1, path2, model_id, version_id):
             }
     
     print(f"✅ Upgraded link to CONFIRMED: {path1} ↔ {path2}")
+
+
+def clean_conflicting_links(db, model_path, confirmed_model_id):
+    """
+    Remove links to models from DIFFERENT families
+    Called after scraping when we now KNOW the model's family ID
+    
+    Args:
+        db: Database dictionary
+        model_path: Path to the model we just scraped
+        confirmed_model_id: The confirmed CivitAI Model ID from scraping
+    """
+    print(f"\n🧹 Cleaning conflicting links for: {model_path}")
+    
+    model = db['models'].get(model_path)
+    if not model:
+        return
+    
+    related_versions = model.get('relatedVersions', [])
+    if not related_versions:
+        print("   No related versions to clean")
+        return
+    
+    # Check each link
+    links_to_remove = []
+    
+    for related_path in related_versions:
+        related_model = db['models'].get(related_path)
+        if not related_model:
+            links_to_remove.append(related_path)
+            continue
+        
+        # Check if related model has a DIFFERENT Model ID
+        other_model_id = related_model.get('civitaiModelId')
+        
+        if other_model_id and str(other_model_id) != str(confirmed_model_id):
+            # CONFLICT DETECTED: Different families linked together!
+            print(f"   ❌ Removing conflicting link: {related_model.get('name', 'Unknown')}")
+            print(f"      This model: {confirmed_model_id}, Other model: {other_model_id}")
+            links_to_remove.append(related_path)
+    
+    # Remove conflicting links
+    if links_to_remove:
+        # Remove from this model's relatedVersions
+        model['relatedVersions'] = [
+            path for path in related_versions 
+            if path not in links_to_remove
+        ]
+        
+        # Remove from linkMetadata
+        if 'linkMetadata' in model:
+            for path in links_to_remove:
+                if path in model['linkMetadata']:
+                    del model['linkMetadata'][path]
+        
+        # Remove reverse links from the other models
+        for related_path in links_to_remove:
+            related_model = db['models'].get(related_path)
+            if not related_model:
+                continue
+            
+            # Remove from their relatedVersions
+            if 'relatedVersions' in related_model:
+                related_model['relatedVersions'] = [
+                    path for path in related_model['relatedVersions']
+                    if path != model_path
+                ]
+            
+            # Remove from their linkMetadata
+            if 'linkMetadata' in related_model:
+                if model_path in related_model['linkMetadata']:
+                    del related_model['linkMetadata'][model_path]
+        
+        print(f"   ✅ Removed {len(links_to_remove)} conflicting link(s)")
+    else:
+        print("   ✅ No conflicting links found")
 
 
 def format_size(bytes_val):
