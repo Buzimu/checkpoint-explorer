@@ -1,5 +1,6 @@
 """
 Background scraping service - periodically scrapes CivitAI data
+FIXED: Skips models with invalid URLs and tracks failed scrapes
 """
 import threading
 import time
@@ -76,6 +77,7 @@ class BackgroundScraper:
                     self.scrapes_today += 1
                 else:
                     # No eligible models, wait longer
+                    print("💤 No eligible models to scrape (all up-to-date or invalid URLs)")
                     time.sleep(self.scrape_interval)
                 
             except Exception as e:
@@ -90,8 +92,9 @@ class BackgroundScraper:
         Find a model that needs scraping
         
         Eligible models:
-        - Have a CivitAI URL
+        - Have a valid CivitAI URL (contains /models/ with numeric ID)
         - Haven't been scraped in the last 24 hours (or never scraped)
+        - Haven't failed scraping in the last hour
         - Not currently being scraped
         """
         db = load_db()
@@ -101,11 +104,36 @@ class BackgroundScraper:
         
         for model_path, model in db['models'].items():
             # Must have CivitAI URL
-            if not model.get('civitaiUrl'):
+            civitai_url = model.get('civitaiUrl', '').strip()
+            if not civitai_url:
                 continue
             
-            # Check last scrape time
+            # Validate URL format (must have /models/ and a numeric ID)
+            if '/models/' not in civitai_url:
+                continue
+            
+            # Quick validation - try to extract model ID
+            import re
+            model_match = re.search(r'/models/(\d+)', civitai_url)
+            if not model_match:
+                # Invalid URL format, skip this model permanently
+                continue
+            
+            # Check if scraping failed recently (within last hour)
             civitai_data = model.get('civitaiData', {})
+            last_error = civitai_data.get('lastError')
+            if last_error:
+                try:
+                    error_time = datetime.fromisoformat(last_error)
+                    hours_since_error = (now - error_time).total_seconds() / 3600
+                    
+                    # Skip if error was less than 1 hour ago
+                    if hours_since_error < 1:
+                        continue
+                except (ValueError, TypeError):
+                    pass  # Invalid date, ignore
+            
+            # Check last scrape time
             scraped_at = civitai_data.get('scrapedAt')
             
             if scraped_at:
@@ -113,8 +141,8 @@ class BackgroundScraper:
                     last_scrape = datetime.fromisoformat(scraped_at)
                     hours_since = (now - last_scrape).total_seconds() / 3600
                     
-                    # Only scrape if it's been 24+ hours
-                    if hours_since < 24:
+                    # Only scrape if it's been 1+ hours
+                    if hours_since < 1:
                         continue
                 except (ValueError, TypeError):
                     pass  # Invalid date, treat as never scraped
@@ -123,7 +151,7 @@ class BackgroundScraper:
             eligible.append({
                 'path': model_path,
                 'name': model.get('name', 'Unknown'),
-                'url': model['civitaiUrl']
+                'url': civitai_url
             })
         
         # Return random model from eligible list
@@ -162,6 +190,10 @@ class BackgroundScraper:
             # Store scraped data
             model['civitaiData'] = scraped_data
             
+            # Clear any previous error (scrape succeeded)
+            if 'lastError' in model['civitaiData']:
+                del model['civitaiData']['lastError']
+            
             # Auto-fill tags if empty
             if not model.get('tags') or len(model['tags']) == 0:
                 model['tags'] = scraped_data.get('tags', [])
@@ -178,6 +210,25 @@ class BackgroundScraper:
             
         except Exception as e:
             print(f"❌ Background scrape failed for {model_info['name']}: {e}")
+            
+            # Record the error and timestamp
+            try:
+                db = load_db()
+                if model_info['path'] in db['models']:
+                    model = db['models'][model_info['path']]
+                    
+                    # Ensure civitaiData exists
+                    if 'civitaiData' not in model:
+                        model['civitaiData'] = {}
+                    
+                    # Record error and timestamp
+                    model['civitaiData']['lastError'] = datetime.now().isoformat()
+                    model['civitaiData']['lastErrorMessage'] = str(e)
+                    
+                    save_db(db)
+                    print(f"📝 Recorded error for {model_info['name']} - will retry in 1 hour")
+            except Exception as save_error:
+                print(f"⚠️ Failed to record error: {save_error}")
 
 
 # Global background scraper instance
