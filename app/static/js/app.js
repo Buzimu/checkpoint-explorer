@@ -344,17 +344,18 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     this.activeVersions[modelPath] = versionIdx;
     this.renderModelGrid();
 
-    // FIX: Update sidebar if this model is selected
-    if (this.selectedModel && this.selectedModel.path === modelPath) {
-      const versions = this.getAllVersions(this.selectedModel);
-      const newActiveVersion = versions[versionIdx];
+    // ALWAYS update sidebar when a version tab is clicked
+    const primaryModel = this.modelData.models[modelPath];
+    if (!primaryModel) return;
 
-      // Update selected model reference
-      this.selectedModel = newActiveVersion;
+    const versions = this.getAllVersions(primaryModel);
+    const newActiveVersion = versions[versionIdx];
 
-      // Re-render details panel
-      this.renderDetails(newActiveVersion);
-    }
+    // Update selected model reference
+    this.selectedModel = newActiveVersion;
+
+    // Re-render details panel
+    this.renderDetails(newActiveVersion);
   }
 
   updateActivityButton(activities) {
