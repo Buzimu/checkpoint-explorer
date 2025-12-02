@@ -776,16 +776,24 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
     if (this.filteredModels.length === 0) {
       grid.innerHTML = `
-                <div class="welcome-screen">
-                    <h2>No models found</h2>
-                    <p>Try adjusting your filters</p>
-                </div>
-            `;
+      <div class="welcome-screen">
+        <h2>No models found</h2>
+        <p>Try adjusting your filters</p>
+      </div>
+    `;
       return;
     }
 
     let visibleCount = 0;
     this.filteredModels.forEach((model) => {
+      // BUGFIX: Skip secondary versions to avoid duplicate stacks
+      if (!this.isPrimaryVersion(model)) {
+        console.log(
+          `⏭️ Skipping secondary version: ${model.name} (part of another version group)`
+        );
+        return;
+      }
+
       const card = this.createModelCard(model);
       if (card) {
         grid.appendChild(card);
@@ -796,11 +804,11 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     // If content rating filtered everything out
     if (visibleCount === 0) {
       grid.innerHTML = `
-                <div class="welcome-screen">
-                    <h2>No models available at this rating</h2>
-                    <p>Try changing the content rating filter (🟢 PG → 🟡 R → 🔴 X)</p>
-                </div>
-            `;
+      <div class="welcome-screen">
+        <h2>No models available at this rating</h2>
+        <p>Try changing the content rating filter (🟢 PG → 🟡 R → 🔴 X)</p>
+      </div>
+    `;
     }
   }
 
@@ -1916,6 +1924,70 @@ ${
 
   closeEditModal() {
     document.getElementById("editModal").style.display = "none";
+  }
+
+  isPrimaryVersion(model) {
+    /**
+     * Determine if this model is the "primary" in its version group
+     * Returns true if this model should be rendered, false if it should be hidden
+     */
+
+    // If no related versions, it's always primary
+    if (!model.relatedVersions || model.relatedVersions.length === 0) {
+      return true;
+    }
+
+    // Get all models in this version group (including self)
+    const versionGroup = [model.path];
+    model.relatedVersions.forEach((relPath) => {
+      if (!versionGroup.includes(relPath)) {
+        versionGroup.push(relPath);
+      }
+    });
+
+    // Determine which model is "most primary" using these rules:
+    // 1. Model with most relatedVersions (the hub)
+    // 2. Model with civitaiUrl (confirmed linking)
+    // 3. Alphabetically first path
+
+    let primaryPath = model.path;
+    let maxRelated = model.relatedVersions.length;
+
+    versionGroup.forEach((path) => {
+      if (path === model.path) return; // Skip self
+
+      const otherModel = this.modelData.models[path];
+      if (!otherModel) return;
+
+      const otherRelatedCount = (otherModel.relatedVersions || []).length;
+
+      // Rule 1: Most related versions
+      if (otherRelatedCount > maxRelated) {
+        primaryPath = path;
+        maxRelated = otherRelatedCount;
+      } else if (otherRelatedCount === maxRelated) {
+        // Rule 2: Has CivitAI URL (tie-breaker)
+        if (
+          otherModel.civitaiUrl &&
+          !this.modelData.models[primaryPath].civitaiUrl
+        ) {
+          primaryPath = path;
+        } else if (
+          (otherModel.civitaiUrl &&
+            this.modelData.models[primaryPath].civitaiUrl) ||
+          (!otherModel.civitaiUrl &&
+            !this.modelData.models[primaryPath].civitaiUrl)
+        ) {
+          // Rule 3: Alphabetically first (final tie-breaker)
+          if (path < primaryPath) {
+            primaryPath = path;
+          }
+        }
+      }
+    });
+
+    // This model is primary only if it's the one we selected
+    return model.path === primaryPath;
   }
 
   async toggleFavorite(path) {
