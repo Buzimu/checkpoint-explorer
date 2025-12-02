@@ -1,6 +1,6 @@
 """
 Background scraping service - periodically scrapes CivitAI data
-FIXED: Skips models with invalid URLs and tracks failed scrapes
+UPDATED: Now includes automatic version linking after scraping
 """
 import threading
 import time
@@ -202,11 +202,27 @@ class BackgroundScraper:
             if not model.get('triggerWords') or len(model['triggerWords']) == 0:
                 model['triggerWords'] = scraped_data.get('trainedWords', [])
             
-            # Save
+            # Save the scraped data first
             if save_db(db):
                 print(f"✅ Background scrape saved: {model_info['name']}")
             else:
                 print(f"❌ Failed to save background scrape: {model_info['name']}")
+                return
+            
+            # ====================================================================
+            # AUTO-LINK RELATED VERSIONS (after saving scraped data)
+            # ====================================================================
+            from app.services.civitai_version_linking import link_versions_from_civitai_scrape
+            
+            try:
+                linking_result = link_versions_from_civitai_scrape(model_info['path'], scraped_data)
+                
+                if linking_result:
+                    stats = linking_result.get('stats', {})
+                    if stats.get('confirmed', 0) > 0 or stats.get('assumed', 0) > 0:
+                        print(f"🔗 Auto-linked versions: {stats.get('confirmed', 0)} confirmed, {stats.get('assumed', 0)} assumed")
+            except Exception as link_error:
+                print(f"⚠️ Version linking failed: {link_error}")
             
         except Exception as e:
             print(f"❌ Background scrape failed for {model_info['name']}: {e}")
