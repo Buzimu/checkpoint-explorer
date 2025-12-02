@@ -142,7 +142,7 @@ class BackgroundScraper:
                     hours_since = (now - last_scrape).total_seconds() / 3600
                     
                     # Only scrape if it's been 1+ hours
-                    if hours_since < 0.1:
+                    if hours_since < 1:
                         continue
                 except (ValueError, TypeError):
                     pass  # Invalid date, treat as never scraped

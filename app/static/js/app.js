@@ -348,7 +348,9 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const primaryModel = this.modelData.models[modelPath];
     if (!primaryModel) return;
 
-    const versions = this.getAllVersions(primaryModel);
+    // FIX: Ensure primary model has path property (database models don't store path ON them)
+    const modelWithPath = { path: modelPath, ...primaryModel };
+    const versions = this.getAllVersions(modelWithPath);
     const newActiveVersion = versions[versionIdx];
 
     // Update selected model reference
