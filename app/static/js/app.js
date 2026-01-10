@@ -1146,37 +1146,49 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
                 </div>
 
                 <!-- File Info -->
-<div class="section">
-  <div class="section-header">
-    <div class="section-title">📁 File Info</div>
-  </div>
-  <div class="info-grid">
-    <div class="info-item">
-      <span class="info-label">File Size</span>
-      <span class="info-value">${model.fileSizeFormatted || "Unknown"}</span>
-    </div>
-    ${
-      model.fileHash
-        ? `
-    <div class="info-item">
-      <span class="info-label">File Hash</span>
-      <span class="info-value" style="font-size: 10px; font-family: monospace;">${model.fileHash}</span>
-    </div>
-    `
-        : ""
-    }
-    ${
-      model.civitaiVersionId
-        ? `
-    <div class="info-item">
-      <span class="info-label">CivitAI Version</span>
-      <span class="info-value">${model.civitaiVersionId}</span>
-    </div>
-    `
-        : ""
-    }
-  </div>
-</div>
+                <div class="section">
+                  <div class="section-header">
+                    <div class="section-title">📁 File Info</div>
+                  </div>
+                  <div class="info-grid">
+                    <div class="info-item">
+                      <span class="info-label">File Size</span>
+                      <span class="info-value">${
+                        model.fileSizeFormatted || "Unknown"
+                      }</span>
+                    </div>
+                    ${
+                      model.fileHash
+                        ? `
+                    <div class="info-item">
+                      <span class="info-label">File Hash</span>
+                      <span class="info-value" style="font-size: 10px; font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                        ${model.fileHash}
+                        <a href="https://civarchive.com/sha256/${model.fileHash}" 
+                          target="_blank" 
+                          title="Search on CivArchive"
+                          style="color: #8be9fd; text-decoration: none; font-size: 14px; transition: color 0.2s ease;"
+                          onmouseover="this.style.color='#50fa7b'"
+                          onmouseout="this.style.color='#8be9fd'">
+                          🔗
+                        </a>
+                      </span>
+                    </div>
+                    `
+                        : ""
+                    }
+                    ${
+                      model.civitaiVersionId
+                        ? `
+                    <div class="info-item">
+                      <span class="info-label">CivitAI Version</span>
+                      <span class="info-value">${model.civitaiVersionId}</span>
+                    </div>
+                    `
+                        : ""
+                    }
+                  </div>
+                </div>
 
 <!-- Versions Section -->
 ${
