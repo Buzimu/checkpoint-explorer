@@ -194,8 +194,12 @@ def add_media_to_model(model_path):
         rating = data.get('rating', 'pg')
         caption = data.get('caption', '')
         
-        # Add to exampleImages
+        # 🔧 BUGFIX: Ensure exampleImages is always a list
         if 'exampleImages' not in db['models'][model_path]:
+            db['models'][model_path]['exampleImages'] = []
+        elif not isinstance(db['models'][model_path]['exampleImages'], list):
+            # Convert dict/other types to list
+            print(f"⚠️  Converting exampleImages from {type(db['models'][model_path]['exampleImages'])} to list for {model_path}")
             db['models'][model_path]['exampleImages'] = []
         
         db['models'][model_path]['exampleImages'].append({
