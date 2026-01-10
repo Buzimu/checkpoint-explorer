@@ -95,6 +95,22 @@ def update_model(model_path):
                     if not new_model.get('triggerWords') or len(new_model['triggerWords']) == 0:
                         new_model['triggerWords'] = scraped_data.get('trainedWords', [])
                         auto_filled['triggerWords'] = new_model['triggerWords']
+
+                    # Auto-fill base model if empty or unknown
+                    current_base = model.get('baseModel', '').strip()
+                    if not current_base or current_base.lower() == 'unknown':
+                        # Find the current version's base model
+                        current_version_id = scraped_data.get('currentVersionId')
+                        versions = scraped_data.get('versions', [])
+                        
+                        for version in versions:
+                            if version.get('id') == current_version_id:
+                                version_base = version.get('baseModel', '')
+                                if version_base and version_base != 'Unknown':
+                                    model['baseModel'] = version_base
+                                    auto_filled['baseModel'] = version_base
+                                    print(f"   ✅ Auto-filled baseModel: {version_base}")
+                                break
                     
                     scrape_result = {
                         'scraped': True,
@@ -405,6 +421,22 @@ def scrape_civitai(model_path):
         if not model.get('triggerWords') or len(model['triggerWords']) == 0:
             model['triggerWords'] = scraped_data.get('trainedWords', [])
             auto_filled['triggerWords'] = model['triggerWords']
+
+        # Auto-fill base model if empty or unknown
+        current_base = model.get('baseModel', '').strip()
+        if not current_base or current_base.lower() == 'unknown':
+            # Find the current version's base model
+            current_version_id = scraped_data.get('currentVersionId')
+            versions = scraped_data.get('versions', [])
+            
+            for version in versions:
+                if version.get('id') == current_version_id:
+                    version_base = version.get('baseModel', '')
+                    if version_base and version_base != 'Unknown':
+                        model['baseModel'] = version_base
+                        auto_filled['baseModel'] = version_base
+                        print(f"   ✅ Auto-filled baseModel: {version_base}")
+                    break
         
         # ====================================================================
         # NEW: AUTO-LINK RELATED VERSIONS
