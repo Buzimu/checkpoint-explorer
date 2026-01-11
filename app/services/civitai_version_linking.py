@@ -1,8 +1,54 @@
 """
 CivitAI-Driven Version Linking
 Links versions when CivitAI data is scraped, not as standalone operation
+
+BUGFIX: Prevents false positive linking by checking BOTH civitaiModelId AND civitaiUrl
 """
 from app.services.database import load_db, save_db
+import re
+
+
+def extract_model_id_from_url(url):
+    """
+    Extract CivitAI Model ID from URL without requiring a scrape
+    
+    Args:
+        url: CivitAI URL like "https://civitai.com/models/123456"
+        
+    Returns:
+        Model ID as string, or None if not found
+    """
+    if not url:
+        return None
+    
+    match = re.search(r'/models/(\d+)', url)
+    if match:
+        return match.group(1)
+    return None
+
+
+def get_model_id(model):
+    """
+    Get Model ID from either civitaiModelId field OR by parsing civitaiUrl
+    
+    This allows us to detect different model families even before scraping
+    
+    Args:
+        model: Model dictionary
+        
+    Returns:
+        Model ID as string, or None if neither field exists
+    """
+    # Try the scraped ID first
+    if model.get('civitaiModelId'):
+        return str(model['civitaiModelId'])
+    
+    # Fall back to parsing the URL
+    url = model.get('civitaiUrl', '')
+    if url:
+        return extract_model_id_from_url(url)
+    
+    return None
 
 
 def link_versions_from_civitai_scrape(model_path, scraped_data):
@@ -38,6 +84,12 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
     
     if not versions:
         print("   No versions found in scraped data")
+        return {'confirmed': [], 'assumed': [], 'stats': {}}
+    
+    # CRITICAL: If this model only has 1 version, DO NOT create assumed links
+    # (prevents matching unrelated models with similar sizes)
+    if len(versions) == 1:
+        print(f"   ⚠️  Only 1 version found - skipping assumed linking to prevent false positives")
         return {'confirmed': [], 'assumed': [], 'stats': {}}
     
     if model_id:
@@ -92,7 +144,8 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
             })
             continue
         
-        # TIER 2: Search for ASSUMED match (file size within ±1%)
+        # TIER 2: Search for ASSUMED match (file size within ±0.1%)
+        # SAFETY: Much stricter tolerance to prevent false positives
         assumed_match = find_assumed_match(
             db, 
             version_sizes, 
@@ -108,7 +161,7 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
             
             print(f"      🔍 ASSUMED: {assumed_match['name']}")
             print(f"         Matched by file size: {format_size(match_size)} ({match_diff_pct:.2f}% diff)")
-            print(f"         ⚠️  This model doesn't have CivitAI link yet")
+            print(f"         ⚠️  This model doesn't have matching CivitAI Model ID")
             
             assumed_links.append({
                 'path': match_path,
@@ -167,16 +220,22 @@ def find_confirmed_match(db, model_id, version_id):
     return None
 
 
-def find_assumed_match(db, target_sizes, exclude_path=None, tolerance=0.01, current_model_id=None):
+def find_assumed_match(db, target_sizes, exclude_path=None, tolerance=0.001, current_model_id=None):
     """
     Find a model that matches by file size (within tolerance)
     This is an ASSUMED match - we think they're related but not confirmed
     
+    CRITICAL SAFETY CHECKS:
+    1. Checks BOTH civitaiModelId AND civitaiUrl (via URL parsing)
+    2. NEVER matches models with different CivitAI Model IDs (even if not scraped)
+    3. NEVER matches if other model has ANY CivitAI link to different model
+    4. Uses STRICT 0.1% tolerance (not 1%) to prevent false positives
+    
     Args:
         target_sizes: List of possible file sizes from CivitAI
         exclude_path: Path to exclude (ourselves)
-        tolerance: Size difference tolerance (default 1%)
-        current_model_id: Current model's CivitAI Model ID (to avoid cross-family matches)
+        tolerance: Size difference tolerance (default 0.1%)
+        current_model_id: Current model's CivitAI Model ID
     """
     best_match = None
     best_diff = float('inf')
@@ -186,20 +245,24 @@ def find_assumed_match(db, target_sizes, exclude_path=None, tolerance=0.01, curr
         if path.startswith('_missing/') or path == exclude_path:
             continue
         
-        # CRITICAL BUGFIX: If this model has a DIFFERENT CivitAI Model ID,
-        # they are confirmed to be from different families - NEVER match them
-        other_model_id = model.get('civitaiModelId')
+        # BUGFIX: Get Model ID from EITHER scraped data OR URL parsing
+        other_model_id = get_model_id(model)
+        
+        # SAFETY CHECK 1: If we can determine the other model's ID (even from URL),
+        # check if they're from different families
         if other_model_id and current_model_id:
             if str(other_model_id) != str(current_model_id):
-                # Confirmed different families - skip this model entirely
+                # Different CivitAI families - NEVER match!
+                # This prevents linking "Aduare Style" with "cat_looking_at_itself"
                 continue
         
-        # Skip models that already have CivitAI links to the SAME family
-        # (those should have been found by confirmed match, not assumed)
+        # SAFETY CHECK 2: If other model has SAME Model ID but different Version ID,
+        # it should have been found by confirmed match - skip to avoid duplicates
         if other_model_id and current_model_id and str(other_model_id) == str(current_model_id):
-            # Same family - should have been confirmed match
-            # Skip to avoid duplicate linking
-            continue
+            other_version_id = model.get('civitaiVersionId')
+            if other_version_id:
+                # Has both IDs - should have been confirmed match
+                continue
         
         # Get model's file size
         model_size = model.get('fileSize') or model.get('_fileSize', 0)
@@ -370,8 +433,8 @@ def clean_conflicting_links(db, model_path, confirmed_model_id):
             links_to_remove.append(related_path)
             continue
         
-        # Check if related model has a DIFFERENT Model ID
-        other_model_id = related_model.get('civitaiModelId')
+        # BUGFIX: Check BOTH scraped ID and URL-parsed ID
+        other_model_id = get_model_id(related_model)
         
         if other_model_id and str(other_model_id) != str(confirmed_model_id):
             # CONFLICT DETECTED: Different families linked together!
