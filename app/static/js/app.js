@@ -842,54 +842,60 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       const zIndex = stackCount - i;
 
       stackCard.style.cssText = `
-        position: absolute;
-        top: ${offset}px;
-        left: ${offset}px;
-        right: -${offset}px;
-        bottom: -${offset}px;
-        background: rgba(40, 42, 54, 0.95);
-        border: 2px solid rgba(68, 71, 90, 0.8);
-        border-radius: 12px;
-        opacity: ${opacity};
-        z-index: ${zIndex};
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-        pointer-events: none;
-      `;
+      position: absolute;
+      top: ${offset}px;
+      left: ${offset}px;
+      right: -${offset}px;
+      bottom: -${offset}px;
+      background: rgba(40, 42, 54, 0.95);
+      border: 2px solid rgba(68, 71, 90, 0.8);
+      border-radius: 12px;
+      opacity: ${opacity};
+      z-index: ${zIndex};
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+    `;
       wrapper.appendChild(stackCard);
     }
 
     // Create main card
     const card = document.createElement("div");
     card.className = "model-card";
-    card.dataset.modelPath = model.path;
+
+    // 🔧 BUGFIX: Store the ACTIVE version's path, not the primary model's path
+    // This ensures drag-dropped images go to the correct version
+    card.dataset.modelPath = activeVersion.path;
+
+    // Store the primary model path for version switching reference
+    card.dataset.primaryPath = model.path;
 
     if (this.selectedModel?.path === model.path) {
       card.classList.add("selected");
     }
 
     card.style.cssText = `
-      background: rgba(40, 42, 54, 0.95);
-      border: ${
-        this.selectedModel?.path === model.path
-          ? "2px solid #ff79c6"
-          : "2px solid #44475a"
-      };
-      border-radius: 12px;
-      overflow: visible;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      position: relative;
-      width: 100%;
-      min-height: 380px;
-      display: flex;
-      flex-direction: column;
-      box-shadow: ${
-        this.selectedModel?.path === model.path
-          ? "0 0 0 3px rgba(255, 121, 198, 0.2), 0 12px 40px rgba(0, 0, 0, 0.4)"
-          : "0 8px 20px rgba(0, 0, 0, 0.3)"
-      };
-      z-index: 100;
-    `;
+    background: rgba(40, 42, 54, 0.95);
+    border: ${
+      this.selectedModel?.path === model.path
+        ? "2px solid #ff79c6"
+        : "2px solid #44475a"
+    };
+    border-radius: 12px;
+    overflow: visible;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    width: 100%;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: ${
+      this.selectedModel?.path === model.path
+        ? "0 0 0 3px rgba(255, 121, 198, 0.2), 0 12px 40px rgba(0, 0, 0, 0.4)"
+        : "0 8px 20px rgba(0, 0, 0, 0.3)"
+    };
+    z-index: 100;
+  `;
 
     // Badges
     const missingBadge = isMissing
@@ -903,67 +909,61 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     let versionSelector = "";
     if (versions.length > 1) {
       versionSelector = `
-  <div class="version-selector" style="
-    padding: 12px 12px 8px 12px;
-    border-bottom: 1px solid #44475a;
-    background: rgba(68, 71, 90, 0.4);
-    backdrop-filter: blur(10px);
-    position: relative;
-    z-index: 200;
-  ">
-    <div class="version-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-      ${versions
-        .map((v, idx) => {
-          // Check link type for this version
-          const linkType = this.getLinkType(model.path, v.path);
-          const linkIndicator =
-            linkType === "confirmed"
-              ? "✅"
-              : linkType === "assumed"
-              ? "🔍"
-              : "";
+<div class="version-selector" style="
+  padding: 12px 12px 8px 12px;
+  border-bottom: 1px solid #44475a;
+  background: rgba(68, 71, 90, 0.4);
+  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 200;
+">
+  <div class="version-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+    ${versions
+      .map((v, idx) => {
+        // Check link type for this version
+        const linkType = this.getLinkType(model.path, v.path);
+        const linkIndicator =
+          linkType === "confirmed" ? "✅" : linkType === "assumed" ? "🔍" : "";
 
-          return `
-          <button
-            class="version-tab ${idx === activeVersionIdx ? "active" : ""}"
-            data-model-path="${this.escapeAttribute(model.path)}"
-            data-version-idx="${idx}"
-            title="${this.getLinkTypeTooltip(linkType, v.name)}"
-            style="
-              padding: 6px 10px;
-              background: ${
-                idx === activeVersionIdx
-                  ? "linear-gradient(135deg, #bd93f9, #ff79c6)"
-                  : "rgba(68, 71, 90, 0.6)"
-              };
-              border: ${
-                idx === activeVersionIdx ? "none" : "1px solid #6272a4"
-              };
-              border-radius: 6px;
-              color: #f8f8f2;
-              font-size: 11px;
-              font-weight: 600;
-              cursor: pointer;
-              transition: all 0.2s ease;
-              display: flex;
-              align-items: center;
-              gap: 4px;
-              white-space: nowrap;
-            "
-          >
-            ${
-              linkIndicator
-                ? `<span style="font-size: 9px;">${linkIndicator}</span>`
-                : ""
-            }
-            ${v.favorite ? '<span style="font-size: 10px;">⭐</span>' : ""}
-            ${this.escapeHtml(v.name || "Version " + (idx + 1))}
-          </button>
-        `;
-        })
-        .join("")}
-    </div>
+        return `
+        <button
+          class="version-tab ${idx === activeVersionIdx ? "active" : ""}"
+          data-model-path="${this.escapeAttribute(model.path)}"
+          data-version-idx="${idx}"
+          title="${this.getLinkTypeTooltip(linkType, v.name)}"
+          style="
+            padding: 6px 10px;
+            background: ${
+              idx === activeVersionIdx
+                ? "linear-gradient(135deg, #bd93f9, #ff79c6)"
+                : "rgba(68, 71, 90, 0.6)"
+            };
+            border: ${idx === activeVersionIdx ? "none" : "1px solid #6272a4"};
+            border-radius: 6px;
+            color: #f8f8f2;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+          "
+        >
+          ${
+            linkIndicator
+              ? `<span style="font-size: 9px;">${linkIndicator}</span>`
+              : ""
+          }
+          ${v.favorite ? '<span style="font-size: 10px;">⭐</span>' : ""}
+          ${this.escapeHtml(v.name || "Version " + (idx + 1))}
+        </button>
+      `;
+      })
+      .join("")}
   </div>
+</div>
 `;
     }
 
@@ -980,49 +980,49 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
     // Wrap media in container with z-index control
     const mediaContainer = `
-      <div style="position: relative; z-index: 1; overflow: hidden; border-radius: 0;">
-        ${mediaHtml}
-      </div>
-    `;
+    <div style="position: relative; z-index: 1; overflow: hidden; border-radius: 0;">
+      ${mediaHtml}
+    </div>
+  `;
 
     // Drop indicator for drag-drop
     const dropIndicator = `<div class="drop-indicator">📁</div>`;
 
     card.innerHTML = `
-      ${dropIndicator}
-      ${missingBadge}
-      ${mismatchBadge}
-      ${versionSelector}
-      ${mediaContainer}
-      <div class="model-info">
-        <div class="model-header">
-          <div class="model-name">${this.escapeHtml(
-            activeVersion.name || "Unnamed Model"
-          )}</div>
-          <div class="favorite-icon" onclick="event.stopPropagation(); app.toggleFavorite('${this.escapeAttribute(
-            activeVersion.path
-          )}')">
-            ${activeVersion.favorite ? "⭐" : "☆"}
-          </div>
-        </div>
-        <div class="model-meta">
-          <div class="model-type">${activeVersion.modelType || "Unknown"}</div>
-          ${
-            activeVersion.baseModel
-              ? `<div class="model-base">${activeVersion.baseModel}</div>`
-              : ""
-          }
+    ${dropIndicator}
+    ${missingBadge}
+    ${mismatchBadge}
+    ${versionSelector}
+    ${mediaContainer}
+    <div class="model-info">
+      <div class="model-header">
+        <div class="model-name">${this.escapeHtml(
+          activeVersion.name || "Unnamed Model"
+        )}</div>
+        <div class="favorite-icon" onclick="event.stopPropagation(); app.toggleFavorite('${this.escapeAttribute(
+          activeVersion.path
+        )}')">
+          ${activeVersion.favorite ? "⭐" : "☆"}
         </div>
       </div>
-    `;
+      <div class="model-meta">
+        <div class="model-type">${activeVersion.modelType || "Unknown"}</div>
+        ${
+          activeVersion.baseModel
+            ? `<div class="model-base">${activeVersion.baseModel}</div>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
 
     // Add version tab click handlers
     card.querySelectorAll(".version-tab").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const modelPath = btn.dataset.modelPath;
+        const primaryPath = btn.dataset.modelPath; // This references the primary model path
         const versionIdx = parseInt(btn.dataset.versionIdx);
-        this.setActiveVersion(modelPath, versionIdx);
+        this.setActiveVersion(primaryPath, versionIdx);
       });
     });
 
