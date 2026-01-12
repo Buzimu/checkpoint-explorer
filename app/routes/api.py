@@ -119,6 +119,20 @@ def update_model(model_path):
                     }
                     
                     print(f"✅ Auto-scrape successful for {model_path}")
+                    # ====================================================================
+                    # NEW: AUTO-LINK RELATED VERSIONS (after auto-scrape)
+                    # ====================================================================
+                    from app.services.civitai_version_linking import link_versions_from_civitai_scrape
+
+                    try:
+                        linking_result = link_versions_from_civitai_scrape(model_path, scraped_data)
+                        
+                        if linking_result:
+                            stats = linking_result.get('stats', {})
+                            if stats.get('confirmed', 0) > 0 or stats.get('assumed', 0) > 0:
+                                print(f"🔗 Auto-linked versions: {stats.get('confirmed', 0)} confirmed, {stats.get('assumed', 0)} assumed")
+                    except Exception as link_error:
+                        print(f"⚠️ Version linking failed: {link_error}")
                     
             except Exception as scrape_error:
                 print(f"⚠️ Auto-scrape failed: {scrape_error}")
