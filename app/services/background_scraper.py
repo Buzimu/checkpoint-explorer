@@ -16,7 +16,7 @@ class BackgroundScraper:
         self.running = False
         self.thread = None
         self.scrape_interval = 60  # Seconds between scrape attempts
-        self.daily_limit = 100  # Max scrapes per day
+        self.daily_limit = 1000  # Max scrapes per day
         self.scrapes_today = 0
         self.last_reset = datetime.now().date()
     

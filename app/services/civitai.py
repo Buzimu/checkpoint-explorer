@@ -244,9 +244,10 @@ class CivitAIService:
     def _extract_versions(self, model_data):
         """
         Extract version information from model data
-        Each version has: id, name, status, trainedWords, files (with sizes), baseModel
+        Each version has: id, name, status, trainedWords, files (with sizes AND HASHES), baseModel
         
-        NEW: Extracts file sizes for version matching!
+        NEW: Extracts file hashes (SHA256, AutoV2, AutoV3) for definitive version matching!
+        This allows 100% accurate version linking without relying on file size tolerance.
         """
         versions = []
         model_versions = model_data.get('modelVersions', [])
@@ -265,11 +266,37 @@ class CivitAIService:
                         # Convert bytes to KB
                         size_kb = metadata['size'] / 1024
                 
+                # 🆕 EXTRACT HASH - This is the KEY improvement!
+                # CivitAI provides hashes as an array of objects: [{"type": "SHA256", "hash": "..."}, ...]
+                file_hash = None
+                hashes_array = file.get('hashes', [])
+                
+                # Priority 1: SHA256 (full 64-char hash - matches our PowerShell script exactly!)
+                for hash_obj in hashes_array:
+                    if hash_obj.get('type') == 'SHA256':
+                        file_hash = hash_obj.get('hash')
+                        break
+                
+                # Priority 2: AutoV2 (first 10 chars of SHA256 - fallback)
+                if not file_hash:
+                    for hash_obj in hashes_array:
+                        if hash_obj.get('type') == 'AutoV2':
+                            file_hash = hash_obj.get('hash')
+                            break
+                
+                # Priority 3: AutoV3 (alternative format - last resort)
+                if not file_hash:
+                    for hash_obj in hashes_array:
+                        if hash_obj.get('type') == 'AutoV3':
+                            file_hash = hash_obj.get('hash')
+                            break
+                
                 file_info = {
                     'name': file.get('name', 'Unknown'),
                     'sizeKB': size_kb,
                     'type': file.get('type', 'Model'),
-                    'format': file.get('metadata', {}).get('format', 'Unknown')
+                    'format': file.get('metadata', {}).get('format', 'Unknown'),
+                    'hash': file_hash  # 🆕 NEW FIELD - SHA256 or AutoV2/AutoV3 hash
                 }
                 files.append(file_info)
             
@@ -279,8 +306,8 @@ class CivitAIService:
                 'status': version.get('status', 'Unknown'),
                 'trainedWords': version.get('trainedWords', []),
                 'available': version.get('status') == 'Published',
-                'files': files,  # NEW: File size info for matching
-                'baseModel': version.get('baseModel', 'Unknown')  # NEW: Base model info
+                'files': files,  # Now includes hashes for definitive matching!
+                'baseModel': version.get('baseModel', 'Unknown')
             }
             versions.append(version_info)
         

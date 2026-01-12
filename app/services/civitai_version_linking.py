@@ -56,6 +56,11 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
     Link versions based on CivitAI scrape results
     This runs automatically after successful CivitAI scrape
     
+    NEW: THREE-TIER matching system (in priority order):
+    1. Hash matching (CONFIRMED - 100% reliable, no false positives)
+    2. Model ID + Version ID (CONFIRMED - both have CivitAI links)
+    3. File size tolerance (ASSUMED - fallback only, less reliable)
+    
     Args:
         model_path: Path to the model that was just scraped
         scraped_data: The civitaiData object from scraping
@@ -101,11 +106,8 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
     print(f"   Found {len(versions)} versions in CivitAI data")
     
     # Track matches
-    confirmed_links = []  # Both have CivitAI links
-    assumed_links = []    # One has link, other matched by size
-    
-    # Current model's version info
-    current_file_size = current_model.get('fileSize') or current_model.get('_fileSize', 0)
+    confirmed_links = []  # Hash match OR both have CivitAI IDs
+    assumed_links = []    # File size match only
     
     # Search for each version in local database
     for version in versions:
@@ -116,24 +118,46 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
         if version_id == current_version_id:
             continue
         
-        # Get file sizes for this version from CivitAI
+        # Get file hashes for this version from CivitAI
         version_files = version.get('files', [])
+        version_hashes = [f.get('hash') for f in version_files if f.get('hash')]
         version_sizes = [f.get('sizeKB', 0) * 1024 for f in version_files if f.get('sizeKB')]
         
-        if not version_sizes:
-            print(f"   ⚠️  No file sizes for version: {version_name}")
+        print(f"\n   Searching for: {version_name} (Version ID: {version_id})")
+        if version_hashes:
+            # Show first hash (truncated for readability)
+            first_hash = version_hashes[0]
+            display_hash = first_hash[:16] + '...' if len(first_hash) > 16 else first_hash
+            print(f"      CivitAI hashes: [{display_hash}] ({len(version_hashes)} file(s))")
+        
+        # ========================================================================
+        # TIER 1: HASH MATCH (Most reliable - 100% accuracy!)
+        # ========================================================================
+        hash_match = find_hash_match(db, version_hashes)
+        
+        if hash_match:
+            match_path = hash_match['path']
+            print(f"      ✅ CONFIRMED (Hash Match): {hash_match['name']}")
+            print(f"         🎯 Definitive match - identical file hash!")
+            
+            confirmed_links.append({
+                'path': match_path,
+                'name': hash_match['name'],
+                'versionId': version_id,
+                'versionName': version_name,
+                'method': 'hash_match'  # 🆕 NEW METHOD TYPE
+            })
             continue
         
-        print(f"\n   Searching for: {version_name} (Version ID: {version_id})")
-        print(f"      CivitAI sizes: {[format_size(s) for s in version_sizes]}")
-        
-        # TIER 1: Search for CONFIRMED match (same Model ID + Version ID)
+        # ========================================================================
+        # TIER 2: MODEL ID + VERSION ID MATCH (Confirmed via CivitAI URLs)
+        # ========================================================================
         confirmed_match = find_confirmed_match(db, model_id, version_id)
         
         if confirmed_match:
             match_path = confirmed_match['path']
-            print(f"      ✅ CONFIRMED: {confirmed_match['name']}")
-            print(f"         Both models have CivitAI link")
+            print(f"      ✅ CONFIRMED (CivitAI IDs): {confirmed_match['name']}")
+            print(f"         Both models have matching CivitAI links")
             
             confirmed_links.append({
                 'path': match_path,
@@ -144,36 +168,40 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
             })
             continue
         
-        # TIER 2: Search for ASSUMED match (file size within ±0.1%)
-        # SAFETY: Much stricter tolerance to prevent false positives
-        assumed_match = find_assumed_match(
-            db, 
-            version_sizes, 
-            exclude_path=model_path, 
-            tolerance=0.01,
-            current_model_id=model_id  # NEW: Pass current model's ID to prevent cross-family matches
-        )
+        # ========================================================================
+        # TIER 3: FILE SIZE MATCH (Assumed - last resort, less reliable)
+        # ========================================================================
+        # Only use if we don't have hash data AND we have size data
+        if not version_hashes and version_sizes:
+            assumed_match = find_assumed_match(
+                db, 
+                version_sizes, 
+                exclude_path=model_path, 
+                tolerance=0.01,  # Very strict 1% tolerance to minimize false positives
+                current_model_id=model_id
+            )
+            
+            if assumed_match:
+                match_path = assumed_match['path']
+                match_size = assumed_match['size']
+                match_diff_pct = assumed_match['diff_pct']
+                
+                print(f"      🔍 ASSUMED (File Size): {assumed_match['name']}")
+                print(f"         Matched by file size: {format_size(match_size)} ({match_diff_pct:.2f}% diff)")
+                print(f"         ⚠️  No hash data available - less reliable")
+                
+                assumed_links.append({
+                    'path': match_path,
+                    'name': assumed_match['name'],
+                    'versionId': version_id,
+                    'versionName': version_name,
+                    'method': 'file_size',
+                    'size': match_size,
+                    'diff_pct': match_diff_pct
+                })
+                continue
         
-        if assumed_match:
-            match_path = assumed_match['path']
-            match_size = assumed_match['size']
-            match_diff_pct = assumed_match['diff_pct']
-            
-            print(f"      🔍 ASSUMED: {assumed_match['name']}")
-            print(f"         Matched by file size: {format_size(match_size)} ({match_diff_pct:.2f}% diff)")
-            print(f"         ⚠️  This model doesn't have matching CivitAI Model ID")
-            
-            assumed_links.append({
-                'path': match_path,
-                'name': assumed_match['name'],
-                'versionId': version_id,
-                'versionName': version_name,
-                'method': 'file_size',
-                'size': match_size,
-                'diff_pct': match_diff_pct
-            })
-        else:
-            print(f"      ❌ No match found")
+        print(f"      ❌ No match found")
     
     # Apply the links to database
     if confirmed_links or assumed_links:
@@ -182,6 +210,13 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
         
         print(f"\n✅ Linking complete:")
         print(f"   Confirmed links: {len(confirmed_links)}")
+        if confirmed_links:
+            hash_matches = sum(1 for link in confirmed_links if link.get('method') == 'hash_match')
+            id_matches = sum(1 for link in confirmed_links if link.get('method') == 'civitai_id')
+            if hash_matches > 0:
+                print(f"     • {hash_matches} by hash (definitive)")
+            if id_matches > 0:
+                print(f"     • {id_matches} by CivitAI ID")
         print(f"   Assumed links: {len(assumed_links)}")
     else:
         print(f"\n   No versions found locally")
@@ -195,6 +230,89 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
             'assumed': len(assumed_links)
         }
     }
+
+def find_hash_match(db, target_hashes):
+    """
+    Find a model that has a matching file hash
+    This is a CONFIRMED match - definitive proof they're the same file
+    
+    Matches:
+    1. Full SHA256 (64 chars) - exact match with our PowerShell-generated hashes
+    2. First 10 chars of SHA256 - if CivitAI only provided AutoV2
+    3. Handles both directions (model has full hash, CivitAI has partial, or vice versa)
+    
+    This is the MOST RELIABLE matching method - 100% accuracy, no false positives.
+    """
+    if not target_hashes:
+        return None
+    
+    for path, model in db['models'].items():
+        # Skip missing models
+        if path.startswith('_missing/'):
+            continue
+        
+        # Check main file hash
+        model_hash = (model.get('fileHash') or '').upper()
+        
+        if model_hash and hash_matches(model_hash, target_hashes):
+            return {
+                'path': path,
+                'name': model.get('name', 'Unknown'),
+                'hash': model_hash
+            }
+        
+        # Check variant hashes
+        if model.get('variants'):
+            high_hash = (model['variants'].get('highHash') or '').upper()
+            if high_hash and hash_matches(high_hash, target_hashes):
+                return {
+                    'path': path,
+                    'name': model.get('name', 'Unknown'),
+                    'hash': high_hash
+                }
+            
+            low_hash = (model['variants'].get('lowHash') or '').upper()
+            if low_hash and hash_matches(low_hash, target_hashes):
+                return {
+                    'path': path,
+                    'name': model.get('name', 'Unknown'),
+                    'hash': low_hash
+                }
+    
+    return None
+
+
+def hash_matches(model_hash, target_hashes):
+    """
+    Check if a model hash matches any of the target hashes
+    Handles both full SHA256 (64 chars) and partial AutoV2 (10 chars) matches
+    """
+    if not model_hash:
+        return False
+    
+    model_upper = model_hash.upper()
+    
+    for target_hash in target_hashes:
+        if not target_hash:
+            continue
+        
+        target_upper = target_hash.upper()
+        
+        # Method 1: Exact match (both are full SHA256 or both are AutoV2)
+        if model_upper == target_upper:
+            return True
+        
+        # Method 2: Partial match - CivitAI provided AutoV2 (10 chars), we have full SHA256 (64 chars)
+        if len(target_upper) == 10 and len(model_upper) == 64:
+            if model_upper.startswith(target_upper):
+                return True
+        
+        # Method 3: Reverse partial - we have AutoV2 (10 chars), CivitAI provided full SHA256 (64 chars)
+        if len(model_upper) == 10 and len(target_upper) == 64:
+            if target_upper.startswith(model_upper):
+                return True
+    
+    return False
 
 
 def find_confirmed_match(db, model_id, version_id):
