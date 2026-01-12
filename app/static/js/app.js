@@ -741,8 +741,25 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
         if (selectedBases.includes("unknown") && isUnknownBase) {
           // Allow through
-        } else if (!selectedBases.includes(baseModel)) {
-          return false;
+        } else {
+          // BUGFIX #7: Normalize baseModel comparison to handle variants
+          // e.g., "SDXL 1.0" should match "SDXL", "SD 1.5" should match "SD1.5"
+          const normalizedBase = baseModel.replace(/\s+/g, "").toUpperCase();
+          const matchesSelected = selectedBases.some((selected) => {
+            const normalizedSelected = selected
+              .replace(/\s+/g, "")
+              .toUpperCase();
+            // Check if the model's base starts with the selected base
+            // This handles "SDXL 1.0" matching "SDXL", "SD 1.5 LCM" matching "SD1.5"
+            return (
+              normalizedBase.startsWith(normalizedSelected) ||
+              normalizedBase === normalizedSelected
+            );
+          });
+
+          if (!matchesSelected) {
+            return false;
+          }
         }
 
         // Favorites filter
@@ -775,6 +792,8 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           return false;
         }
 
+        // BUGFIX #8: Keep all models in filteredModels for accurate counting
+        // Secondary versions will be filtered during rendering, not here
         return true;
       })
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -803,10 +822,11 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
     let visibleCount = 0;
     this.filteredModels.forEach((model) => {
-      // BUGFIX: Skip secondary versions to avoid duplicate stacks
+      // BUGFIX #8: Skip secondary versions during rendering
+      // They're counted in filteredModels but shown as stacks, not separate cards
       if (!this.isPrimaryVersion(model)) {
         console.log(
-          `⏭️ Skipping secondary version: ${model.name} (part of another version group)`
+          `⏭️ Skipping secondary version: ${model.name} (part of version stack)`
         );
         return;
       }
@@ -3262,6 +3282,8 @@ ${
 
   updateModelCount() {
     const count = this.filteredModels.length;
+    // BUGFIX #8: Count ALL models including stacked versions
+    // Total should be 271 (all unique models), not 208 (just primary versions)
     const total = this.modelData
       ? Object.keys(this.modelData.models).length
       : 0;
