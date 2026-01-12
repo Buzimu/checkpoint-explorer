@@ -2495,7 +2495,6 @@ ${
     const oldPaths = new Set();
 
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
-      // BUGFIX: Skip already-missing models - they're either staying missing or user deleted them
       if (path.startsWith("_missing/")) {
         console.log(
           `⏭️  Skipping already-missing entry during analysis: ${path}`
@@ -2536,6 +2535,9 @@ ${
 
     const processedOldPaths = new Set();
 
+    // 🔧 BUGFIX: Track which hash entries have been used
+    const usedHashIndices = new Map(); // hash -> Set of used indices
+
     Object.entries(newDb.models || {}).forEach(([newPath, newModel]) => {
       const hash = newModel.fileHash;
 
@@ -2548,60 +2550,119 @@ ${
 
       if (oldByHash.has(hash)) {
         const matches = oldByHash.get(hash);
-        const match = matches[0];
-        const { path: oldPath, model: oldModel } = match;
 
-        result.matched.push({
-          hash,
-          oldPath,
-          newPath,
-          name: newModel.name || oldModel.name || "Unnamed",
-          pathChanged: oldPath !== newPath,
-        });
-        result.stats.matched++;
-        processedOldPaths.add(oldPath);
-        matched = true;
+        // 🔧 BUGFIX: Try exact path match first (for duplicates)
+        let matchIdx = matches.findIndex((m) => m.path === newPath);
+
+        // If no exact match, find first unused match
+        if (matchIdx === -1) {
+          if (!usedHashIndices.has(hash)) {
+            usedHashIndices.set(hash, new Set());
+          }
+          const usedIndices = usedHashIndices.get(hash);
+
+          matchIdx = matches.findIndex((m, idx) => !usedIndices.has(idx));
+        }
+
+        if (matchIdx !== -1) {
+          const match = matches[matchIdx];
+          const { path: oldPath, model: oldModel } = match;
+
+          // Mark this match as used
+          if (!usedHashIndices.has(hash)) {
+            usedHashIndices.set(hash, new Set());
+          }
+          usedHashIndices.get(hash).add(matchIdx);
+
+          result.matched.push({
+            hash,
+            oldPath,
+            newPath,
+            name: newModel.name || oldModel.name || "Unnamed",
+            pathChanged: oldPath !== newPath,
+          });
+          result.stats.matched++;
+          processedOldPaths.add(oldPath);
+          matched = true;
+        }
       }
 
+      // Try variant matching if main match failed
       if (!matched && newModel.variants) {
         if (
           newModel.variants.highHash &&
           oldByHash.has(newModel.variants.highHash)
         ) {
           const matches = oldByHash.get(newModel.variants.highHash);
-          const match = matches[0];
-          const { path: oldPath, model: oldModel } = match;
 
-          result.matched.push({
-            hash: newModel.variants.highHash,
-            oldPath,
-            newPath,
-            name: newModel.name || oldModel.name || "Unnamed",
-            pathChanged: oldPath !== newPath,
-            matchedViaVariant: true,
-          });
-          result.stats.matched++;
-          processedOldPaths.add(oldPath);
-          matched = true;
+          let matchIdx = matches.findIndex((m) => m.path === newPath);
+
+          if (matchIdx === -1) {
+            if (!usedHashIndices.has(newModel.variants.highHash)) {
+              usedHashIndices.set(newModel.variants.highHash, new Set());
+            }
+            const usedIndices = usedHashIndices.get(newModel.variants.highHash);
+            matchIdx = matches.findIndex((m, idx) => !usedIndices.has(idx));
+          }
+
+          if (matchIdx !== -1) {
+            const match = matches[matchIdx];
+            const { path: oldPath, model: oldModel } = match;
+
+            if (!usedHashIndices.has(newModel.variants.highHash)) {
+              usedHashIndices.set(newModel.variants.highHash, new Set());
+            }
+            usedHashIndices.get(newModel.variants.highHash).add(matchIdx);
+
+            result.matched.push({
+              hash: newModel.variants.highHash,
+              oldPath,
+              newPath,
+              name: newModel.name || oldModel.name || "Unnamed",
+              pathChanged: oldPath !== newPath,
+              matchedViaVariant: true,
+            });
+            result.stats.matched++;
+            processedOldPaths.add(oldPath);
+            matched = true;
+          }
         } else if (
           newModel.variants.lowHash &&
           oldByHash.has(newModel.variants.lowHash)
         ) {
           const matches = oldByHash.get(newModel.variants.lowHash);
-          const match = matches[0];
-          const { path: oldPath, model: oldModel } = match;
 
-          result.matched.push({
-            hash: newModel.variants.lowHash,
-            oldPath,
-            newPath,
-            name: newModel.name || oldModel.name || "Unnamed",
-            pathChanged: oldPath !== newPath,
-            matchedViaVariant: true,
-          });
-          result.stats.matched++;
-          processedOldPaths.add(oldPath);
-          matched = true;
+          let matchIdx = matches.findIndex((m) => m.path === newPath);
+
+          if (matchIdx === -1) {
+            if (!usedHashIndices.has(newModel.variants.lowHash)) {
+              usedHashIndices.set(newModel.variants.lowHash, new Set());
+            }
+            const usedIndices = usedHashIndices.get(newModel.variants.lowHash);
+            matchIdx = matches.findIndex((m, idx) => !usedIndices.has(idx));
+          }
+
+          if (matchIdx !== -1) {
+            const match = matches[matchIdx];
+            const { path: oldPath, model: oldModel } = match;
+
+            if (!usedHashIndices.has(newModel.variants.lowHash)) {
+              usedHashIndices.set(newModel.variants.lowHash, new Set());
+            }
+            usedHashIndices.get(newModel.variants.lowHash).add(matchIdx);
+
+            result.matched.push({
+              hash: newModel.variants.lowHash,
+              oldPath,
+              newPath,
+              name: newModel.name || oldModel.name || "Unnamed",
+              pathChanged: oldPath !== newPath,
+              matchedViaVariant: true,
+            });
+            result.stats.matched++;
+            processedOldPaths.add(oldPath);
+            matched = true;
+          }
         }
       }
 
