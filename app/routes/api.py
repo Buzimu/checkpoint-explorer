@@ -97,7 +97,7 @@ def update_model(model_path):
                         auto_filled['triggerWords'] = new_model['triggerWords']
 
                     # Auto-fill base model if empty or unknown
-                    current_base = model.get('baseModel', '').strip()
+                    current_base = new_model.get('baseModel', '').strip()
                     if not current_base or current_base.lower() == 'unknown':
                         # Find the current version's base model
                         current_version_id = scraped_data.get('currentVersionId')
