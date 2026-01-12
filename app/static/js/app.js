@@ -723,8 +723,18 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
         const isUnknownType =
           !modelType || modelType === "" || modelType === "unknown";
 
-        if (selectedTypes.includes("unknown") && isUnknownType) {
-          // Allow through
+        // BUGFIX #9: Treat types not in VALID_TYPES as "unknown"
+        // e.g., "diffusion", "clip", etc. should be caught by "unknown" checkbox
+        const isInvalidType =
+          modelType &&
+          modelType !== "unknown" &&
+          !this.VALID_TYPES.includes(modelType);
+
+        if (
+          selectedTypes.includes("unknown") &&
+          (isUnknownType || isInvalidType)
+        ) {
+          // Allow through if "unknown" is selected
         } else if (!selectedTypes.includes(modelType)) {
           return false;
         }
@@ -745,20 +755,35 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           // BUGFIX #7: Normalize baseModel comparison to handle variants
           // e.g., "SDXL 1.0" should match "SDXL", "SD 1.5" should match "SD1.5"
           const normalizedBase = baseModel.replace(/\s+/g, "").toUpperCase();
-          const matchesSelected = selectedBases.some((selected) => {
-            const normalizedSelected = selected
-              .replace(/\s+/g, "")
-              .toUpperCase();
-            // Check if the model's base starts with the selected base
-            // This handles "SDXL 1.0" matching "SDXL", "SD 1.5 LCM" matching "SD1.5"
-            return (
-              normalizedBase.startsWith(normalizedSelected) ||
-              normalizedBase === normalizedSelected
-            );
-          });
 
-          if (!matchesSelected) {
-            return false;
+          // BUGFIX #9: Check if this base is in our valid list
+          const isInvalidBase =
+            baseModel &&
+            baseModel !== "unknown" &&
+            !this.VALID_BASES.some((valid) => {
+              const normalizedValid = valid.replace(/\s+/g, "").toUpperCase();
+              return normalizedBase.startsWith(normalizedValid);
+            });
+
+          // If "unknown" is selected and this base is invalid/unrecognized, allow through
+          if (selectedBases.includes("unknown") && isInvalidBase) {
+            // Allow through
+          } else {
+            const matchesSelected = selectedBases.some((selected) => {
+              const normalizedSelected = selected
+                .replace(/\s+/g, "")
+                .toUpperCase();
+              // Check if the model's base starts with the selected base
+              // This handles "SDXL 1.0" matching "SDXL", "SD 1.5 LCM" matching "SD1.5"
+              return (
+                normalizedBase.startsWith(normalizedSelected) ||
+                normalizedBase === normalizedSelected
+              );
+            });
+
+            if (!matchesSelected) {
+              return false;
+            }
           }
         }
 
