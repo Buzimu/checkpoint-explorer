@@ -107,7 +107,7 @@ def update_model(model_path):
                             if version.get('id') == current_version_id:
                                 version_base = version.get('baseModel', '')
                                 if version_base and version_base != 'Unknown':
-                                    model['baseModel'] = version_base
+                                    new_model['baseModel'] = version_base
                                     auto_filled['baseModel'] = version_base
                                     print(f"   ✅ Auto-filled baseModel: {version_base}")
                                 break
