@@ -133,6 +133,20 @@ class CivitAIService:
                 'versions': self._extract_versions(model_data),
                 'scrapedAt': datetime.now().isoformat()
             }
+            # 🆕 NEW: Extract the hash for the CURRENT version (the one the URL points to)
+            # This allows us to detect if the user assigned the wrong version URL
+            current_version_hash = None
+            for version in scraped_data['versions']:
+                if version['id'] == ids['versionId']:
+                    # Get the hash from the first file in this version
+                    if version['files'] and len(version['files']) > 0:
+                        current_version_hash = version['files'][0].get('hash')
+                    break
+            
+            # Store the expected hash for mismatch detection
+            if current_version_hash:
+                scraped_data['expectedHash'] = current_version_hash
+                print(f"   📋 Expected hash for this version: {current_version_hash[:16]}...")
             
             print(f"✅ Scraped successfully: {scraped_data['modelName']}")
             print(f"   Found {len(scraped_data['versions'])} versions")

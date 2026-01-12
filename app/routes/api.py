@@ -2,6 +2,7 @@
 API routes for model data operations
 """
 from flask import Blueprint, jsonify, request
+from datetime import datetime
 from app.services.database import load_db, save_db
 from app.services.media import save_uploaded_file
 from app.services.civitai import get_civitai_service
@@ -41,6 +42,9 @@ def update_model(model_path):
         if model_path not in db['models']:
             return jsonify({'success': False, 'error': 'Model not found'}), 404
         
+        # Track hash mismatch state (default false so it's always defined)
+        hash_mismatch = False
+
         # Get old model data
         old_model = db['models'][model_path]
         old_url = old_model.get('civitaiUrl', '')
@@ -76,6 +80,32 @@ def update_model(model_path):
                     ids = service.extract_ids_from_url(new_url)
                     new_model['civitaiModelId'] = ids['modelId']
                     new_model['civitaiVersionId'] = ids['versionId']
+
+                    # 🆕 NEW: Check for hash mismatch
+                    local_hash = new_model.get('fileHash', '').upper()
+                    expected_hash = scraped_data.get('expectedHash', '').upper()
+                    
+                    if local_hash and expected_hash:
+                        # Compare hashes (handle both full SHA256 and AutoV2 partial)
+                        if not hash_matches_simple(local_hash, expected_hash):
+                            hash_mismatch = True
+                            print(f"   🚨 HASH MISMATCH DETECTED!")
+                            print(f"      Local:    {local_hash[:16]}...")
+                            print(f"      Expected: {expected_hash[:16]}...")
+                            print(f"      User likely assigned wrong version URL!")
+                            
+                            # Store mismatch info
+                            new_model['hashMismatch'] = {
+                                'detected': True,
+                                'localHash': local_hash,
+                                'expectedHash': expected_hash,
+                                'detectedAt': datetime.now().isoformat()
+                            }
+                        else:
+                            # Clear any previous mismatch
+                            if 'hashMismatch' in new_model:
+                                del new_model['hashMismatch']
+                            print(f"   ✅ Hash verified - correct version!")
                     
                     # Store scraped data
                     new_model['civitaiData'] = scraped_data
@@ -115,7 +145,8 @@ def update_model(model_path):
                     scrape_result = {
                         'scraped': True,
                         'data': scraped_data,
-                        'autoFilled': auto_filled
+                        'autoFilled': auto_filled,
+                        'hashMismatch': hash_mismatch
                     }
                     
                     print(f"✅ Auto-scrape successful for {model_path}")
@@ -148,7 +179,8 @@ def update_model(model_path):
         if save_db(db):
             response = {
                 'success': True,
-                'model': db['models'][model_path]
+                'model': db['models'][model_path],
+                'hashMismatch': hash_mismatch
             }
             
             # Include scrape result if available
@@ -161,6 +193,27 @@ def update_model(model_path):
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def hash_matches_simple(hash1, hash2):
+    """Simple hash comparison helper"""
+    if not hash1 or not hash2:
+        return False
+    
+    h1 = hash1.upper()
+    h2 = hash2.upper()
+    
+    # Exact match
+    if h1 == h2:
+        return True
+    
+    # Partial match (one is AutoV2, other is full SHA256)
+    if len(h1) == 10 and len(h2) == 64:
+        return h2.startswith(h1)
+    if len(h2) == 10 and len(h1) == 64:
+        return h1.startswith(h2)
+    
+    return False
 
 
 @bp.route('/models/<path:model_path>/favorite', methods=['POST'])
@@ -520,10 +573,7 @@ def skip_version(model_path):
         print(f"❌ Skip version failed: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-"""
-Version Linking API Endpoint
-Add this to app/routes/api.py after the unskip_version endpoint
-"""
+
 
 @bp.route('/link-versions', methods=['POST'])
 def link_versions():

@@ -39,6 +39,7 @@ class ModelExplorer {
       hasImagesOnly: false,
       showMissing: false, // NEW: Filter for missing models
       showMismatch: false, // NEW: Filter for mismatched models
+      showHashMismatch: false, // 🆕 NEW
     };
 
     // BUGFIX #4: Define valid types and bases for mismatch detection
@@ -163,6 +164,13 @@ class ModelExplorer {
       console.log("🔀 Mismatch filter changed");
       this.applyFilters();
     });
+    // Add listener
+    document
+      .getElementById("hashMismatchFilter")
+      .addEventListener("change", () => {
+        console.log("🚨 Hash mismatch filter changed");
+        this.applyFilters();
+      });
 
     // Modal close
     document.getElementById("closeEditModal").addEventListener("click", () => {
@@ -650,6 +658,8 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     // BUGFIX #4: Get new filter states
     const showMissingOnly = document.getElementById("missingFilter").checked;
     const showMismatchOnly = document.getElementById("mismatchFilter").checked;
+    const showHashMismatchOnly =
+      document.getElementById("hashMismatchFilter").checked;
 
     console.log("Filter settings:", {
       searchTerm,
@@ -682,6 +692,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           _hasMismatch: hasTypeMismatch || hasBaseMismatch,
           _typeMismatch: hasTypeMismatch,
           _baseMismatch: hasBaseMismatch,
+          _hasHashMismatch: model.hashMismatch?.detected || false,
         };
       })
       .filter((model) => {
@@ -760,6 +771,9 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
         if (showMismatchOnly && !model._hasMismatch) {
           return false;
         }
+        if (showHashMismatchOnly && !model._hasHashMismatch) {
+          return false;
+        }
 
         return true;
       })
@@ -818,6 +832,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
   createModelCard(model) {
     const isMissing = model._status === "missing";
     const isMismatch = model._hasMismatch;
+    const hasHashMismatch = model.hashMismatch?.detected; // 🆕 NEW
 
     if (!this.canShowModel(model)) {
       return null;
@@ -903,6 +918,10 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       : "";
     const mismatchBadge = isMismatch
       ? '<div class="missing-badge" style="top: 42px;">🔀 MISMATCH</div>'
+      : "";
+    // 🆕 NEW: Hash mismatch badge (most critical!)
+    const hashMismatchBadge = hasHashMismatch
+      ? '<div class="missing-badge" style="top: 72px; background: rgba(255, 85, 85, 0.95);">🚨 WRONG VERSION</div>'
       : "";
 
     // Version selector (tabs)
@@ -992,6 +1011,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     ${dropIndicator}
     ${missingBadge}
     ${mismatchBadge}
+    ${hashMismatchBadge}
     ${versionSelector}
     ${mediaContainer}
     <div class="model-info">
@@ -1072,6 +1092,40 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       </div>
     `
       : "";
+
+    // 🆕 NEW: Hash mismatch warning (if detected)
+    const hashMismatchWarning = model.hashMismatch?.detected
+      ? `
+  <div class="missing-warning" style="border-color: #ff5555; background: linear-gradient(135deg, rgba(255, 85, 85, 0.15), rgba(255, 85, 85, 0.05));">
+    <div class="warning-header" style="color: #ff5555;">🚨 Hash Mismatch Detected!</div>
+    <p>The file hash <strong>does not match</strong> the CivitAI version URL you assigned.</p>
+    <p><strong>This means you likely downloaded a different version than the URL indicates.</strong></p>
+    
+    <div style="margin: 16px 0;">
+      <div style="font-size: 12px; color: #6272a4; margin-bottom: 4px;">Local File Hash:</div>
+      <div class="last-seen-path">${model.hashMismatch.localHash}</div>
+      
+      <div style="font-size: 12px; color: #6272a4; margin: 8px 0 4px 0;">Expected Hash (from CivitAI):</div>
+      <div class="last-seen-path">${model.hashMismatch.expectedHash}</div>
+    </div>
+    
+    <p style="font-size: 12px; color: #ff5555;"><strong>Action Required:</strong></p>
+    <ul style="font-size: 12px; margin-left: 20px; line-height: 1.8;">
+      <li>Check which version you actually downloaded</li>
+      <li>Update the CivitAI URL to match your downloaded version, OR</li>
+      <li>Download the correct version from the URL you assigned</li>
+    </ul>
+  </div>
+`
+      : "";
+
+    sidebar.innerHTML = `
+  <div class="details-content">
+    ${hashMismatchWarning}
+    ${mismatchWarning}
+    ...
+  </div>
+`;
 
     sidebar.innerHTML = `
             <div class="details-content">
