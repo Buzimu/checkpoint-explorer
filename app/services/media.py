@@ -33,13 +33,21 @@ def generate_file_hash(file_content):
     return hashlib.sha256(file_content).hexdigest()[:16]
 
 
-def save_uploaded_file(file_content, original_filename):
+def save_uploaded_file(file_content, original_filename, model_hash_prefix=None, rating='pg', number='001'):
     """
-    Save uploaded file to images directory with hash-based filename
+    Save uploaded file to images directory with standardized filename
+    
+    New standardized format: [Hash8]-[rating]-[img/vid]-[#].ext
+    Example: a1b2c3d4-pg-img-001.jpg
+    
+    Falls back to content hash if model_hash_prefix not provided.
     
     Args:
         file_content: Binary content of the file
         original_filename: Original filename with extension
+        model_hash_prefix: First 8 chars of model's hash (optional)
+        rating: Content rating (pg, r, x) - default 'pg'
+        number: Sequential number as string (e.g., '001') - default '001'
         
     Returns:
         New filename if successful, None otherwise
@@ -49,9 +57,15 @@ def save_uploaded_file(file_content, original_filename):
         if not is_valid:
             return None
         
-        # Generate hash-based filename
-        file_hash = generate_file_hash(file_content)
-        filename = f"{file_hash}{ext}"
+        # If no model hash provided, fall back to content hash (legacy behavior)
+        if not model_hash_prefix:
+            file_hash = generate_file_hash(file_content)
+            filename = f"{file_hash}{ext}"
+        else:
+            # Use standardized naming: [Hash8]-[rating]-[img/vid]-[#].ext
+            ext_lower = ext.lower()
+            media_type = 'vid' if ext_lower in ['.mp4', '.webm'] else 'img'
+            filename = f"{model_hash_prefix}-{rating}-{media_type}-{number}{ext}"
         
         # Save file
         file_path = os.path.join(IMAGES_DIR, filename)

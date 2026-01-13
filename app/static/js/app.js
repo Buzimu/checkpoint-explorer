@@ -483,6 +483,45 @@ class ModelExplorer {
     this.updateGalleryFilters();
   }
 
+  async auditMedia() {
+    try {
+      this.showToast("⏳ Auditing media files...");
+
+      const response = await fetch("/api/audit-media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("🔍 Media Audit Results:", result);
+
+        const stats = result.stats;
+        let message = `✅ Media Audit Complete!\n\n`;
+        message += `📊 Results:\n`;
+        message += `  • Models audited: ${stats.models_audited}\n`;
+        message += `  • Media verified: ${stats.media_verified}\n`;
+        message += `  • Invalid references removed: ${stats.references_removed}\n`;
+        message += `  • Orphaned media re-associated: ${stats.media_re_associated}\n`;
+        message += `  • Files renamed to standard format: ${stats.media_renamed}`;
+
+        this.showToast(message);
+
+        // Reload to show updated media associations
+        await this.loadFromServer();
+      } else {
+        const error = await response.json();
+        this.showToast(
+          `❌ Media audit failed: ${error.error || "Unknown error"}`
+        );
+      }
+    } catch (error) {
+      console.error("Media audit failed:", error);
+      this.showToast("❌ Media audit failed: " + error.message);
+    }
+  }
+
   async detectNewerVersions() {
     try {
       this.showToast("⏳ Checking for newer versions...");

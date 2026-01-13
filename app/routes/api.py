@@ -263,13 +263,34 @@ def upload_media():
         
         file = request.files['file']
         model_path = request.form.get('modelPath')
+        rating = request.form.get('rating', 'pg')
         
         if not file.filename:
             return jsonify({'success': False, 'error': 'No file selected'}), 400
         
-        # Read and save file
+        if not model_path:
+            return jsonify({'success': False, 'error': 'Model path required'}), 400
+        
+        # Load database to get model info
+        db = load_db()
+        if model_path not in db['models']:
+            return jsonify({'success': False, 'error': 'Model not found'}), 404
+        
+        model = db['models'][model_path]
+        
+        # Get model hash prefix (first 8 chars)
+        from app.services.media_auditor import get_model_hash_prefix, get_next_media_number
+        model_hash_prefix = get_model_hash_prefix(model)
+        
+        if not model_hash_prefix:
+            return jsonify({'success': False, 'error': 'Model has no hash - cannot generate standardized filename'}), 400
+        
+        # Get next sequential number for this model
+        next_number = get_next_media_number(model)
+        
+        # Read and save file with standardized naming
         file_content = file.read()
-        filename = save_uploaded_file(file_content, file.filename)
+        filename = save_uploaded_file(file_content, file.filename, model_hash_prefix, rating, next_number)
         
         if not filename:
             return jsonify({'success': False, 'error': 'Invalid file type'}), 400
@@ -279,12 +300,14 @@ def upload_media():
         
     except Exception as e:
         print(f"❌ Upload failed: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route('/models/<path:model_path>/add-media', methods=['POST'])
 def add_media_to_model(model_path):
-    """Add uploaded media to model's exampleImages"""
+    """Add uploaded media to model's exampleImages and run auditor"""
     try:
         db = load_db()
         if model_path not in db['models']:
@@ -311,12 +334,23 @@ def add_media_to_model(model_path):
         
         if save_db(db):
             print(f"✅ Added media {filename} to model {model_path}")
-            return jsonify({'success': True})
+            
+            # Run media auditor for this model to verify everything is correct
+            from app.services.media_auditor import audit_media_for_model
+            db_reloaded = load_db()
+            audit_stats = audit_media_for_model(db_reloaded, model_path, db_reloaded['models'][model_path])
+            if audit_stats['removed'] > 0 or audit_stats['added'] > 0:
+                save_db(db_reloaded)
+                print(f"🔍 Media audit: verified={audit_stats['verified']}, removed={audit_stats['removed']}, added={audit_stats['added']}")
+            
+            return jsonify({'success': True, 'audit': audit_stats})
         else:
             return jsonify({'success': False, 'error': 'Failed to save'}), 500
             
     except Exception as e:
         print(f"❌ Add media failed: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -547,6 +581,20 @@ def scrape_civitai(model_path):
                 print(f"   ✅ Model is up to date")
         except Exception as detect_error:
             print(f"⚠️  Newer version detection failed (non-critical): {detect_error}")
+        
+        # ====================================================================
+        # RUN MEDIA AUDITOR (after scrape)
+        # ====================================================================
+        try:
+            from app.services.media_auditor import audit_media_for_model
+            print(f"🔍 Running media audit for {model_path}...")
+            db_for_audit = load_db()
+            audit_stats = audit_media_for_model(db_for_audit, model_path, db_for_audit['models'][model_path])
+            if audit_stats['removed'] > 0 or audit_stats['added'] > 0:
+                save_db(db_for_audit)
+                print(f"   Media audit: verified={audit_stats['verified']}, removed={audit_stats['removed']}, added={audit_stats['added']}")
+        except Exception as audit_error:
+            print(f"⚠️  Media audit failed (non-critical): {audit_error}")
         
         # Save
         if save_db(db):
@@ -837,6 +885,67 @@ def delete_media_file(filename):
         
     except Exception as e:
         print(f"❌ Failed to delete file {filename}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/audit-media', methods=['POST'])
+def audit_media():
+    """
+    Manually trigger a full media audit
+    
+    Scans all media files and:
+    1. Removes references to missing files
+    2. Re-associates orphaned media based on hash matching
+    
+    Optional parameters:
+    {
+        "modelPath": "path/to/model.safetensors"  // Audit single model only
+    }
+    """
+    try:
+        from app.services.media_auditor import audit_all_media, audit_media_for_model
+        
+        data = request.json or {}
+        model_path = data.get('modelPath')
+        
+        db = load_db()
+        
+        if model_path:
+            # Audit single model
+            if model_path not in db['models']:
+                return jsonify({'success': False, 'error': 'Model not found'}), 404
+            
+            print(f"\n🔍 Auditing media for: {model_path}")
+            model_stats = audit_media_for_model(db, model_path, db['models'][model_path])
+            
+            if save_db(db):
+                return jsonify({
+                    'success': True,
+                    'stats': model_stats,
+                    'modelPath': model_path
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Failed to save database'}), 500
+        else:
+            # Audit all models
+            result = audit_all_media(db)
+            
+            if save_db(db):
+                return jsonify({
+                    'success': True,
+                    'stats': result['stats'],
+                    'details': result['details']
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Failed to save database'}), 500
+        
+    except Exception as e:
+        print(f"❌ Media audit failed: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({

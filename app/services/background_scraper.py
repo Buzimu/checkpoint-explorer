@@ -244,6 +244,20 @@ class BackgroundScraper:
             except Exception as detect_error:
                 print(f"⚠️  Newer version detection failed (non-critical): {detect_error}")
             
+            # ====================================================================
+            # RUN MEDIA AUDITOR (after scrape)
+            # ====================================================================
+            try:
+                from app.services.media_auditor import audit_media_for_model
+                print(f"🔍 Running media audit for {model_info['path']}...")
+                db = load_db()
+                audit_stats = audit_media_for_model(db, model_info['path'], db['models'][model_info['path']])
+                if audit_stats['removed'] > 0 or audit_stats['added'] > 0:
+                    save_db(db)
+                    print(f"   Media audit: verified={audit_stats['verified']}, removed={audit_stats['removed']}, added={audit_stats['added']}")
+            except Exception as audit_error:
+                print(f"⚠️  Media audit failed (non-critical): {audit_error}")
+            
         except Exception as e:
             print(f"❌ Background scrape failed for {model_info['name']}: {e}")
             
