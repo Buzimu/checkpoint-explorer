@@ -610,72 +610,95 @@ def skip_version(model_path):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-
-@bp.route('/link-versions', methods=['POST'])
-def link_versions():
+@bp.route('/gallery', methods=['GET'])
+def get_gallery():
     """
-    Link related model versions together based on CivitAI IDs and file sizes
+    Get all media files from database and identify orphaned files
     
-    Request body (optional):
+    Returns:
     {
-        "methods": ["civitai", "filesize", "name"],  // Which methods to use
-        "tolerance": 0.05,                           // File size tolerance (default 5%)
-        "force": false                               // Overwrite existing links
+        "media": [
+            {
+                "filename": "abc123.jpg",
+                "rating": "pg",
+                "modelName": "Model Name",
+                "modelPath": "models/checkpoint.safetensors",
+                "isVideo": false,
+                "orphaned": false
+            }
+        ],
+        "stats": {
+            "total": 150,
+            "orphaned": 5,
+            "images": 120,
+            "videos": 30
+        }
     }
     """
     try:
-        from app.services.version_linker import get_version_linker
-        
-        # Get request parameters
-        data = request.json or {}
-        methods = data.get('methods', ['civitai', 'filesize'])
-        tolerance = data.get('tolerance', 0.05)
-        force = data.get('force', False)
-        
-        print(f"\n🔗 === VERSION LINKING START ===")
-        print(f"Methods: {methods}")
-        print(f"Tolerance: {tolerance * 100}%")
-        print(f"Force: {force}")
+        import os
+        from config import IMAGES_DIR
         
         # Load database
         db = load_db()
         
-        # If not forcing, preserve existing links
-        if not force:
-            print("📋 Preserving existing relatedVersions links...")
-            existing_links = 0
-            for model in db['models'].values():
-                if model.get('relatedVersions'):
-                    existing_links += 1
-            print(f"   Found {existing_links} models with existing links")
+        # Collect all media from database
+        media_in_db = {}
+        media_list = []
         
-        # Create linker
-        linker = get_version_linker(tolerance=tolerance)
+        for model_path, model in db['models'].items():
+            if model.get('exampleImages'):
+                for img in model['exampleImages']:
+                    filename = img['filename']
+                    ext = filename.lower()
+                    is_video = ext.endswith('.mp4') or ext.endswith('.webm')
+                    
+                    media_in_db[filename] = True
+                    media_list.append({
+                        'filename': filename,
+                        'rating': img.get('rating', 'pg'),
+                        'modelName': model.get('name', 'Unknown'),
+                        'modelPath': model_path,
+                        'isVideo': is_video,
+                        'orphaned': False
+                    })
         
-        # Link versions
-        models, stats, groups_info = linker.link_all(db['models'], methods=methods)
+        # Check for orphaned files in images directory
+        if os.path.exists(IMAGES_DIR):
+            for filename in os.listdir(IMAGES_DIR):
+                file_path = os.path.join(IMAGES_DIR, filename)
+                if os.path.isfile(file_path):
+                    ext = filename.lower()
+                    # Check if it's a valid media file
+                    if any(ext.endswith(e) for e in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.webm']):
+                        if filename not in media_in_db:
+                            # This is an orphaned file
+                            is_video = ext.endswith('.mp4') or ext.endswith('.webm')
+                            media_list.append({
+                                'filename': filename,
+                                'rating': 'pg',  # Default rating for orphaned files
+                                'modelName': '⚠️ Orphaned File',
+                                'modelPath': None,
+                                'isVideo': is_video,
+                                'orphaned': True
+                            })
         
-        # Update database
-        db['models'] = models
+        # Calculate stats
+        stats = {
+            'total': len(media_list),
+            'orphaned': sum(1 for m in media_list if m['orphaned']),
+            'images': sum(1 for m in media_list if not m['isVideo']),
+            'videos': sum(1 for m in media_list if m['isVideo'])
+        }
         
-        # Save
-        if save_db(db):
-            print("✅ Database saved successfully")
-            print(f"=== VERSION LINKING COMPLETE ===\n")
-            
-            return jsonify({
-                'success': True,
-                'stats': stats,
-                'groups': groups_info
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Failed to save database'
-            }), 500
-    
+        return jsonify({
+            'success': True,
+            'media': media_list,
+            'stats': stats
+        })
+        
     except Exception as e:
-        print(f"❌ Version linking failed: {e}")
+        print(f"❌ Gallery fetch failed: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -769,6 +792,51 @@ def detect_newer_versions_route():
     
     except Exception as e:
         print(f"❌ Newer version detection failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/media/<path:filename>', methods=['DELETE'])
+def delete_media_file(filename):
+    """
+    Delete a media file from the images directory
+    Used for cleaning up orphaned files
+    """
+    try:
+        import os
+        from config import IMAGES_DIR
+        
+        file_path = os.path.join(IMAGES_DIR, filename)
+        
+        # Security check - make sure file is in images directory
+        if not file_path.startswith(os.path.abspath(IMAGES_DIR)):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid file path'
+            }), 400
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return jsonify({
+                'success': False,
+                'error': 'File not found'
+            }), 404
+        
+        # Delete the file
+        os.remove(file_path)
+        print(f"🗑️ Deleted orphaned file: {filename}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'File {filename} deleted successfully'
+        })
+        
+    except Exception as e:
+        print(f"❌ Failed to delete file {filename}: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({

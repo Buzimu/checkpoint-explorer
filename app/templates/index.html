@@ -24,10 +24,10 @@
 
         <button
           class="btn btn-secondary"
-          id="linkVersionsBtn"
-          title="Link related model versions"
+          id="galleryBtn"
+          title="View all media in collection"
         >
-          🔗 Link Versions
+          🖼️ Gallery
         </button>
 
         <button
@@ -346,6 +346,63 @@
       <div id="lightboxContent"></div>
       <div class="lightbox-caption" id="lightboxCaption"></div>
       <div class="lightbox-controls" id="lightboxControls"></div>
+    </div>
+
+    <!-- Gallery Modal -->
+    <div class="modal-overlay" id="galleryModal" style="display: none">
+      <div class="modal-content modal-gallery">
+        <div class="modal-header">
+          <h2>🖼️ Media Gallery</h2>
+          <button class="btn-close" onclick="app.closeGalleryModal()">✕</button>
+        </div>
+
+        <div class="gallery-stats">
+          <div class="gallery-stat">
+            <span class="stat-label">Total:</span>
+            <span class="stat-value" id="galleryTotalCount">0</span>
+          </div>
+          <div class="gallery-stat">
+            <span class="stat-label">Orphaned:</span>
+            <span class="stat-value" id="galleryOrphanedCount">0</span>
+          </div>
+          <div class="gallery-stat">
+            <span class="stat-label">Images:</span>
+            <span class="stat-value" id="galleryImagesCount">0</span>
+          </div>
+          <div class="gallery-stat">
+            <span class="stat-label">Videos:</span>
+            <span class="stat-value" id="galleryVideosCount">0</span>
+          </div>
+        </div>
+
+        <div class="gallery-filters">
+          <select
+            class="rating-select"
+            id="galleryRatingSelect"
+            onchange="app.updateGalleryFilters()"
+          >
+            <option value="pg">🟢 PG</option>
+            <option value="r">🟡 R</option>
+            <option value="x">🔴 X</option>
+          </select>
+
+          <button
+            class="btn btn-icon"
+            id="galleryVideoToggle"
+            data-mode="images"
+            title="Showing images only (click to include videos)"
+            onclick="app.toggleGalleryVideoMode()"
+          >
+            🖼️ Images
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="gallery-grid" id="galleryGrid">
+            <!-- Gallery items will be loaded here -->
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="../static/js/app.js"></script>

@@ -110,8 +110,8 @@ class ModelExplorer {
       this.toggleVideoMode();
     });
 
-    document.getElementById("linkVersionsBtn").addEventListener("click", () => {
-      this.triggerVersionLinking();
+    document.getElementById("galleryBtn").addEventListener("click", () => {
+      this.openGallery();
     });
 
     document
@@ -253,57 +253,234 @@ class ModelExplorer {
 
   // Add this method to the ModelExplorer class
 
-  async triggerVersionLinking() {
+  async openGallery() {
     try {
-      this.showToast("⏳ Analyzing models and linking versions...");
+      this.showToast("⏳ Loading gallery...");
 
-      const response = await fetch("/api/link-versions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          methods: ["civitai", "filesize"], // Use both methods
-          tolerance: 0.05, // 5% file size tolerance
-          force: false, // Don't overwrite existing links
-        }),
-      });
+      const response = await fetch("/api/gallery");
 
       if (response.ok) {
         const result = await response.json();
+        console.log("🖼️ Gallery data:", result);
 
-        console.log("🔗 Version Linking Results:", result);
-
-        // Show detailed toast
-        let message = `✅ Version Linking Complete!\n`;
-        message += `\n📊 Stats:`;
-        message += `\n  • ${result.stats.linkedGroups} groups found`;
-        message += `\n  • ${result.stats.modelsWithVersions} models now have versions`;
-        message += `\n  • ${result.stats.unlinkedModels} models remain unlinked`;
-
-        this.showToast(message);
-
-        // Log groups for debugging
-        if (result.groups && result.groups.length > 0) {
-          console.log("\n📋 Linked Groups:");
-          result.groups.forEach((group, idx) => {
-            console.log(`\n${idx + 1}. ${group.name}`);
-            console.log(`   Method: ${group.method}`);
-            console.log(`   Versions: ${group.versions}`);
-            console.log(`   Models:`, group.models);
-          });
-        }
-
-        // Reload database to show stacked cards
-        await this.loadFromServer();
+        // Show the gallery modal
+        this.showGalleryModal(result);
       } else {
         const error = await response.json();
         this.showToast(
-          `❌ Version linking failed: ${error.error || "Unknown error"}`
+          `❌ Gallery load failed: ${error.error || "Unknown error"}`
         );
       }
     } catch (error) {
-      console.error("Version linking failed:", error);
-      this.showToast("❌ Version linking failed: " + error.message);
+      console.error("Gallery load failed:", error);
+      this.showToast("❌ Gallery load failed: " + error.message);
     }
+  }
+
+  showGalleryModal(galleryData) {
+    const modal = document.getElementById("galleryModal");
+
+    // Update stats
+    document.getElementById("galleryTotalCount").textContent =
+      galleryData.stats.total;
+    document.getElementById("galleryOrphanedCount").textContent =
+      galleryData.stats.orphaned;
+    document.getElementById("galleryImagesCount").textContent =
+      galleryData.stats.images;
+    document.getElementById("galleryVideosCount").textContent =
+      galleryData.stats.videos;
+
+    // Store gallery data for filtering
+    this.galleryData = galleryData.media;
+
+    // Get current filters from header
+    const currentRating = document.getElementById("contentRatingSelect").value;
+    const showVideos = this.videoMode;
+
+    // Render filtered gallery
+    this.renderGalleryGrid(currentRating, showVideos);
+
+    modal.style.display = "flex";
+  }
+
+  renderGalleryGrid(ratingFilter = "pg", showVideos = false) {
+    const gridContainer = document.getElementById("galleryGrid");
+
+    // Filter media based on rating and video mode
+    const filtered = this.galleryData.filter((item) => {
+      const ratingMatch = item.rating === ratingFilter;
+      const typeMatch = showVideos ? true : !item.isVideo;
+      return ratingMatch && typeMatch;
+    });
+
+    if (filtered.length === 0) {
+      gridContainer.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #6272a4;">
+          <p>No media found for the selected filters</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Render grid items
+    gridContainer.innerHTML = filtered
+      .map((item) => {
+        const orphanedClass = item.orphaned ? "gallery-item-orphaned" : "";
+        const orphanedLabel = item.orphaned
+          ? '<span class="orphan-badge">⚠️ ORPHANED</span>'
+          : "";
+
+        if (item.isVideo) {
+          return `
+          <div class="gallery-item ${orphanedClass}" onclick="app.openGalleryMedia('${this.escapeAttribute(
+            item.filename
+          )}', ${item.orphaned}, '${this.escapeAttribute(
+            item.modelPath || ""
+          )}')">
+            <video class="gallery-thumbnail" muted loop onmouseover="this.play()" onmouseout="this.pause()">
+              <source src="images/${item.filename}" type="video/${item.filename
+            .split(".")
+            .pop()}">
+            </video>
+            ${orphanedLabel}
+            <div class="gallery-item-info">
+              <div class="gallery-item-name">${this.escapeHtml(
+                item.modelName
+              )}</div>
+            </div>
+          </div>
+        `;
+        } else {
+          return `
+          <div class="gallery-item ${orphanedClass}" onclick="app.openGalleryMedia('${this.escapeAttribute(
+            item.filename
+          )}', ${item.orphaned}, '${this.escapeAttribute(
+            item.modelPath || ""
+          )}')">
+            <img class="gallery-thumbnail" src="images/${
+              item.filename
+            }" alt="${this.escapeHtml(item.modelName)}">
+            ${orphanedLabel}
+            <div class="gallery-item-info">
+              <div class="gallery-item-name">${this.escapeHtml(
+                item.modelName
+              )}</div>
+            </div>
+          </div>
+        `;
+        }
+      })
+      .join("");
+  }
+
+  openGalleryMedia(filename, isOrphaned, modelPath) {
+    if (isOrphaned) {
+      // For orphaned media, open lightbox with delete option
+      this.openOrphanedMediaLightbox(filename);
+    } else {
+      // For regular media, open existing lightbox
+      const caption =
+        this.galleryData.find((m) => m.filename === filename)?.modelName || "";
+      this.openLightbox(filename, caption, modelPath);
+    }
+  }
+
+  openOrphanedMediaLightbox(filename) {
+    const lightbox = document.getElementById("imageLightbox");
+    const lightboxContent = document.getElementById("lightboxContent");
+    const lightboxCaption = document.getElementById("lightboxCaption");
+    const lightboxControls = document.getElementById("lightboxControls");
+
+    const ext = filename.toLowerCase();
+    const isVideo = ext.endsWith(".mp4") || ext.endsWith(".webm");
+
+    if (isVideo) {
+      lightboxContent.innerHTML = `
+        <video id="lightboxMedia" autoplay loop muted controls style="max-width: 90%; max-height: 90vh; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
+          <source src="images/${filename}" type="video/${ext.split(".").pop()}">
+        </video>
+      `;
+    } else {
+      lightboxContent.innerHTML = `
+        <img id="lightboxMedia" src="images/${filename}" alt="Orphaned media" style="max-width: 90%; max-height: 90vh; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
+      `;
+    }
+
+    lightboxCaption.innerHTML = `⚠️ <strong>Orphaned File</strong> - This media is not linked to any model`;
+
+    lightboxControls.innerHTML = `
+      <div class="lightbox-rating-controls">
+        <button class="btn-lightbox-delete" onclick="app.deleteOrphanedMedia('${this.escapeAttribute(
+          filename
+        )}')">🗑️ Delete Orphaned File</button>
+      </div>
+    `;
+
+    lightbox.style.display = "flex";
+  }
+
+  async deleteOrphanedMedia(filename) {
+    if (
+      !confirm(
+        `Are you sure you want to delete this orphaned file?\n\n${filename}\n\nThis action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/media/${encodeURIComponent(filename)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        this.showToast("✅ Orphaned file deleted!");
+        this.closeLightbox();
+        // Refresh gallery
+        await this.openGallery();
+      } else {
+        this.showToast("❌ Failed to delete file");
+      }
+    } catch (error) {
+      console.error("Failed to delete file:", error);
+      this.showToast("❌ Failed to delete file");
+    }
+  }
+
+  closeGalleryModal() {
+    const modal = document.getElementById("galleryModal");
+    modal.style.display = "none";
+    this.galleryData = null;
+  }
+
+  updateGalleryFilters() {
+    const ratingSelect = document.getElementById("galleryRatingSelect");
+    const videoToggle = document.getElementById("galleryVideoToggle");
+
+    const rating = ratingSelect.value;
+    const showVideos = videoToggle.dataset.mode === "both";
+
+    this.renderGalleryGrid(rating, showVideos);
+  }
+
+  toggleGalleryVideoMode() {
+    const btn = document.getElementById("galleryVideoToggle");
+    const currentMode = btn.dataset.mode || "images";
+
+    if (currentMode === "images") {
+      btn.dataset.mode = "both";
+      btn.innerHTML = "🎬 All Media";
+      btn.title = "Showing images and videos (click for images only)";
+    } else {
+      btn.dataset.mode = "images";
+      btn.innerHTML = "🖼️ Images";
+      btn.title = "Showing images only (click to include videos)";
+    }
+
+    this.updateGalleryFilters();
   }
 
   async detectNewerVersions() {
