@@ -153,7 +153,7 @@ def update_model(model_path):
                     # ====================================================================
                     # NEW: AUTO-LINK RELATED VERSIONS (after auto-scrape)
                     # ====================================================================
-                    from app.services.civitai_version_linking import link_versions_from_civitai_scrape
+                    from app.services.civitai_version_linking import link_versions_from_civitai_scrape, detect_newer_versions
 
                     try:
                         linking_result = link_versions_from_civitai_scrape(model_path, scraped_data)
@@ -164,6 +164,24 @@ def update_model(model_path):
                                 print(f"🔗 Auto-linked versions: {stats.get('confirmed', 0)} confirmed, {stats.get('assumed', 0)} assumed")
                     except Exception as link_error:
                         print(f"⚠️ Version linking failed: {link_error}")
+                    
+                    # ====================================================================
+                    # NEW: AUTO-DETECT NEWER VERSIONS (after scrape)
+                    # ====================================================================
+                    try:
+                        print(f"🔍 Checking for newer versions after scrape...")
+                        db_reloaded = load_db()  # Reload to get latest links
+                        newer_versions_info = detect_newer_versions(db_reloaded)
+                        
+                        # Update the model's newVersionAvailable flag
+                        if model_path in newer_versions_info:
+                            new_model['newVersionAvailable'] = newer_versions_info[model_path]
+                            print(f"   ✨ Newer version detected for {model_path}")
+                        elif 'newVersionAvailable' in new_model:
+                            del new_model['newVersionAvailable']
+                            print(f"   ✅ Model is up to date")
+                    except Exception as detect_error:
+                        print(f"⚠️  Newer version detection failed (non-critical): {detect_error}")
                     
             except Exception as scrape_error:
                 print(f"⚠️ Auto-scrape failed: {scrape_error}")
@@ -508,9 +526,27 @@ def scrape_civitai(model_path):
         # ====================================================================
         # NEW: AUTO-LINK RELATED VERSIONS
         # ====================================================================
-        from app.services.civitai_version_linking import link_versions_from_civitai_scrape
+        from app.services.civitai_version_linking import link_versions_from_civitai_scrape, detect_newer_versions
         
         linking_result = link_versions_from_civitai_scrape(model_path, scraped_data)
+        
+        # ====================================================================
+        # NEW: AUTO-DETECT NEWER VERSIONS (after scrape)
+        # ====================================================================
+        try:
+            print(f"🔍 Checking for newer versions after scrape...")
+            db = load_db()  # Reload to get latest links
+            newer_versions_info = detect_newer_versions(db)
+            
+            # Update the model's newVersionAvailable flag
+            if model_path in newer_versions_info:
+                db['models'][model_path]['newVersionAvailable'] = newer_versions_info[model_path]
+                print(f"   ✨ Newer version detected for {model_path}")
+            elif 'newVersionAvailable' in db['models'][model_path]:
+                del db['models'][model_path]['newVersionAvailable']
+                print(f"   ✅ Model is up to date")
+        except Exception as detect_error:
+            print(f"⚠️  Newer version detection failed (non-critical): {detect_error}")
         
         # Save
         if save_db(db):
@@ -681,3 +717,61 @@ def unskip_version(model_path):
     except Exception as e:
         print(f"❌ Unskip version failed: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/detect-newer-versions', methods=['POST'])
+def detect_newer_versions_route():
+    """
+    Detect models that have newer versions available on CivitAI
+    
+    This compares publishedAt dates from CivitAI data and flags models
+    that have newer versions than the current one.
+    
+    Returns:
+        JSON with detected newer versions and statistics
+    """
+    try:
+        from app.services.civitai_version_linking import detect_newer_versions
+        
+        print("\n🔍 === NEWER VERSION DETECTION START ===")
+        
+        # Load database
+        db = load_db()
+        
+        # Detect newer versions
+        newer_versions_info = detect_newer_versions(db)
+        
+        # Store the detection results in each model
+        for path, info in newer_versions_info.items():
+            if path in db['models']:
+                db['models'][path]['newVersionAvailable'] = info
+        
+        # Clear flag for models without newer versions
+        for path, model in db['models'].items():
+            if path not in newer_versions_info and 'newVersionAvailable' in model:
+                del model['newVersionAvailable']
+        
+        # Save database
+        if save_db(db):
+            print("✅ Database saved successfully")
+            print(f"=== NEWER VERSION DETECTION COMPLETE ===\n")
+            
+            return jsonify({
+                'success': True,
+                'count': len(newer_versions_info),
+                'models': list(newer_versions_info.keys())
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to save database'
+            }), 500
+    
+    except Exception as e:
+        print(f"❌ Newer version detection failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

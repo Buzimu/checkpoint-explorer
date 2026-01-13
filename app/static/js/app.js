@@ -114,6 +114,12 @@ class ModelExplorer {
       this.triggerVersionLinking();
     });
 
+    document
+      .getElementById("detectNewerVersionsBtn")
+      .addEventListener("click", () => {
+        this.detectNewerVersions();
+      });
+
     // Search and filter listeners - BUGFIX #2: Ensure filters apply immediately
     document.getElementById("searchInput").addEventListener("input", () => {
       console.log("🔍 Search input changed");
@@ -297,6 +303,41 @@ class ModelExplorer {
     } catch (error) {
       console.error("Version linking failed:", error);
       this.showToast("❌ Version linking failed: " + error.message);
+    }
+  }
+
+  async detectNewerVersions() {
+    try {
+      this.showToast("⏳ Checking for newer versions...");
+
+      const response = await fetch("/api/detect-newer-versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        console.log("✨ Newer Version Detection Results:", result);
+
+        if (result.count > 0) {
+          const message = `✨ Found ${result.count} model(s) with newer versions available!`;
+          this.showToast(message);
+        } else {
+          this.showToast("✅ All models are up to date!");
+        }
+
+        // Reload database to show the new version badges
+        await this.loadFromServer();
+      } else {
+        const error = await response.json();
+        this.showToast(
+          `❌ Version detection failed: ${error.error || "Unknown error"}`
+        );
+      }
+    } catch (error) {
+      console.error("Newer version detection failed:", error);
+      this.showToast("❌ Version detection failed: " + error.message);
     }
   }
 
@@ -896,6 +937,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const isMissing = model._status === "missing";
     const isMismatch = model._hasMismatch;
     const hasHashMismatch = model.hashMismatch?.detected; // 🆕 NEW
+    const hasNewerVersion = model.newVersionAvailable?.hasNewerVersion; // 🆕 NEW VERSION BADGE
 
     if (!this.canShowModel(model)) {
       return null;
@@ -986,6 +1028,10 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const hashMismatchBadge = hasHashMismatch
       ? '<div class="missing-badge" style="top: 72px; background: rgba(255, 85, 85, 0.95);">🚨 WRONG VERSION</div>'
       : "";
+    // 🆕 NEW VERSION BADGE: Indicates newer version available
+    const newVersionBadge = hasNewerVersion
+      ? '<div class="new-version-badge">✨ NEW VERSION</div>'
+      : "";
 
     // Version selector (tabs)
     let versionSelector = "";
@@ -1075,6 +1121,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     ${missingBadge}
     ${mismatchBadge}
     ${hashMismatchBadge}
+    ${newVersionBadge}
     ${versionSelector}
     ${mediaContainer}
     <div class="model-info">
@@ -1182,6 +1229,65 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 `
       : "";
 
+    // 🆕 NEW VERSION AVAILABLE WARNING
+    const newVersionWarning = model.newVersionAvailable?.hasNewerVersion
+      ? `
+  <div class="missing-warning" style="border-color: #bd93f9; background: linear-gradient(135deg, rgba(189, 147, 249, 0.15), rgba(189, 147, 249, 0.05));">
+    <div class="warning-header" style="color: #bd93f9;">✨ New Version Available!</div>
+    <p><strong>A newer version of this model has been released on CivitAI!</strong></p>
+    
+    <div style="margin: 16px 0; padding: 12px; background: rgba(68, 71, 90, 0.3); border-radius: 8px;">
+      <div style="font-size: 13px; font-weight: 600; color: #bd93f9; margin-bottom: 8px;">
+        📦 ${this.escapeHtml(
+          model.newVersionAvailable.newestVersion.versionName
+        )}
+      </div>
+      <div style="font-size: 12px; color: #6272a4; margin-bottom: 4px;">
+        📅 Published: ${new Date(
+          model.newVersionAvailable.newestVersion.publishedAt
+        ).toLocaleDateString()}
+      </div>
+      ${
+        model.newVersionAvailable.newestVersion.baseModel
+          ? `<div style="font-size: 12px; color: #6272a4;">
+             🎯 Base: ${this.escapeHtml(
+               model.newVersionAvailable.newestVersion.baseModel
+             )}
+           </div>`
+          : ""
+      }
+    </div>
+    
+    ${
+      model.newVersionAvailable.count > 1
+        ? `<p style="font-size: 12px; color: #8be9fd; margin-bottom: 12px;">
+           💡 There are ${model.newVersionAvailable.count} newer versions available in total.
+         </p>`
+        : ""
+    }
+    
+    <div style="display: flex; gap: 8px; margin-top: 12px;">
+      <a href="${
+        model.civitaiUrl
+      }" target="_blank" class="btn btn-primary" style="font-size: 12px; padding: 8px 16px;">
+        🌐 View on CivitAI
+      </a>
+      ${
+        model.civitaiModelId &&
+        model.newVersionAvailable.newestVersion.versionId
+          ? `<a href="https://civitai.com/models/${model.civitaiModelId}?modelVersionId=${model.newVersionAvailable.newestVersion.versionId}" 
+             target="_blank" 
+             class="btn btn-secondary" 
+             style="font-size: 12px; padding: 8px 16px;">
+            ⬇️ Download Latest
+          </a>`
+          : ""
+      }
+    </div>
+  </div>
+`
+      : "";
+
     sidebar.innerHTML = `
   <div class="details-content">
     ${hashMismatchWarning}
@@ -1192,6 +1298,8 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
     sidebar.innerHTML = `
             <div class="details-content">
+                ${hashMismatchWarning}
+                ${newVersionWarning}
                 ${mismatchWarning}
                 <div class="details-header">
                     <div class="details-title">${this.escapeHtml(

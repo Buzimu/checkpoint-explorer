@@ -604,3 +604,105 @@ def format_size(bytes_val):
             return f"{bytes_val:.2f} {unit}"
         bytes_val /= 1024.0
     return f"{bytes_val:.2f} PB"
+
+
+def detect_newer_versions(db):
+    """
+    Detect models that have newer versions available on CivitAI
+    
+    For each model with civitaiData:
+    1. Find its publishedAt date (or use the first primary model as reference)
+    2. Check all relatedVersions for newer publishedAt dates
+    3. Flag model with newVersionAvailable metadata
+    
+    Returns:
+        Dictionary mapping model paths to their newer version info
+    """
+    from datetime import datetime
+    
+    print("\n🔍 Detecting newer versions...")
+    
+    newer_versions_found = {}
+    
+    for path, model in db['models'].items():
+        # Skip missing models
+        if path.startswith('_missing/'):
+            continue
+        
+        # Check if model has CivitAI data with versions
+        civitai_data = model.get('civitaiData')
+        if not civitai_data or not civitai_data.get('versions'):
+            continue
+        
+        # Get the current model's published date
+        # First, try to find it from the civitaiVersionId
+        current_version_id = model.get('civitaiVersionId')
+        current_published_date = None
+        
+        for version in civitai_data['versions']:
+            if str(version.get('id')) == str(current_version_id):
+                current_published_date = version.get('publishedAt')
+                break
+        
+        # If no current version found, use the first version (primary model)
+        if not current_published_date and civitai_data['versions']:
+            current_published_date = civitai_data['versions'][0].get('publishedAt')
+        
+        if not current_published_date:
+            continue
+        
+        # Parse the current date
+        try:
+            current_date = datetime.fromisoformat(current_published_date.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            continue
+        
+        # Check all versions for newer ones
+        newer_versions = []
+        
+        for version in civitai_data['versions']:
+            version_id = str(version.get('id'))
+            version_published = version.get('publishedAt')
+            
+            # Skip if this is the current version
+            if version_id == str(current_version_id):
+                continue
+            
+            if not version_published:
+                continue
+            
+            try:
+                version_date = datetime.fromisoformat(version_published.replace('Z', '+00:00'))
+                
+                # Check if this version is newer
+                if version_date > current_date:
+                    newer_versions.append({
+                        'versionId': version_id,
+                        'versionName': version.get('name', 'Unknown'),
+                        'publishedAt': version_published,
+                        'baseModel': version.get('baseModel', 'Unknown'),
+                        'available': version.get('available', True),
+                        'files': version.get('files', [])
+                    })
+            except (ValueError, AttributeError):
+                continue
+        
+        # If newer versions found, store the info
+        if newer_versions:
+            # Sort by date (newest first)
+            newer_versions.sort(key=lambda v: v['publishedAt'], reverse=True)
+            
+            newest = newer_versions[0]
+            newer_versions_found[path] = {
+                'hasNewerVersion': True,
+                'newestVersion': newest,
+                'allNewerVersions': newer_versions,
+                'count': len(newer_versions)
+            }
+            
+            print(f"   📢 {model.get('name', 'Unknown')}: {len(newer_versions)} newer version(s) found!")
+            print(f"      Newest: {newest['versionName']} ({newest['publishedAt'][:10]})")
+    
+    print(f"\n✅ Detection complete: {len(newer_versions_found)} model(s) have newer versions")
+    
+    return newer_versions_found
