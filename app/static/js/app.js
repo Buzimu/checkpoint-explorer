@@ -625,7 +625,6 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
   // Set active version for a model
   setActiveVersion(modelPath, versionIdx) {
     this.activeVersions[modelPath] = versionIdx;
-    this.renderModelGrid();
 
     // ALWAYS update sidebar when a version tab is clicked
     const primaryModel = this.modelData.models[modelPath];
@@ -636,11 +635,44 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const versions = this.getAllVersions(modelWithPath);
     const newActiveVersion = versions[versionIdx];
 
-    // Update selected model reference
+    // Update selected model reference BEFORE rendering
     this.selectedModel = newActiveVersion;
+
+    // Re-render grid with updated selection
+    this.renderModelGrid();
 
     // Re-render details panel
     this.renderDetails(newActiveVersion);
+
+    // Scroll the active tab into view after render completes
+    // Use requestAnimationFrame to ensure DOM is fully updated
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        // Find the card by primary path (stored in data-primary-path)
+        const modelCard = document.querySelector(
+          `.model-card[data-primary-path="${CSS.escape(modelPath)}"]`
+        );
+        if (modelCard) {
+          const carousel = modelCard.querySelector(".version-carousel-scroll");
+          const activeTab = modelCard.querySelector(".version-tab.active");
+          if (activeTab && carousel) {
+            // Scroll the carousel to center the active tab
+            const carouselRect = carousel.getBoundingClientRect();
+            const tabRect = activeTab.getBoundingClientRect();
+            const scrollLeft =
+              carousel.scrollLeft +
+              (tabRect.left - carouselRect.left) -
+              carouselRect.width / 2 +
+              tabRect.width / 2;
+
+            carousel.scrollTo({
+              left: scrollLeft,
+              behavior: "smooth",
+            });
+          }
+        }
+      }, 50);
+    });
   }
 
   updateActivityButton(activities) {
@@ -1233,79 +1265,99 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     z-index: 100;
   `;
 
-    // Badges
+    // Badges - positioned below carousel if stacked, otherwise at top
+    const badgeTopOffset = versions.length > 1 ? 60 : 12;
     const missingBadge = isMissing
-      ? '<div class="missing-badge">⚠️ MISSING</div>'
+      ? `<div class="missing-badge" style="top: ${
+          badgeTopOffset + 30
+        }px;">⚠️ MISSING</div>`
       : "";
     const mismatchBadge = isMismatch
-      ? '<div class="missing-badge" style="top: 42px;">🔀 MISMATCH</div>'
+      ? `<div class="missing-badge" style="top: ${badgeTopOffset}px;">🔀 MISMATCH</div>`
       : "";
     // 🆕 NEW: Hash mismatch badge (most critical!)
     const hashMismatchBadge = hasHashMismatch
-      ? '<div class="missing-badge" style="top: 72px; background: rgba(255, 85, 85, 0.95);">🚨 WRONG VERSION</div>'
+      ? `<div class="missing-badge" style="top: ${
+          badgeTopOffset + 60
+        }px; background: rgba(255, 85, 85, 0.95);">🚨 WRONG VERSION</div>`
       : "";
     // 🆕 NEW VERSION BADGE: Indicates newer version available
     const newVersionBadge = hasNewerVersion
-      ? '<div class="new-version-badge">✨ NEW VERSION</div>'
+      ? `<div class="new-version-badge" style="top: ${badgeTopOffset}px;">✨ NEW VERSION</div>`
       : "";
 
-    // Version selector (tabs)
+    // Version selector (carousel)
     let versionSelector = "";
     if (versions.length > 1) {
+      const carouselId = `carousel-${model.path.replace(/[^a-z0-9]/gi, "-")}`;
       versionSelector = `
 <div class="version-selector" style="
-  padding: 12px 12px 8px 12px;
+  padding: 12px;
   border-bottom: 1px solid #44475a;
   background: rgba(68, 71, 90, 0.4);
   backdrop-filter: blur(10px);
   position: relative;
   z-index: 200;
 ">
-  <div class="version-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
-    ${versions
-      .map((v, idx) => {
-        // Check link type for this version
-        const linkType = this.getLinkType(model.path, v.path);
-        const linkIndicator =
-          linkType === "confirmed" ? "✅" : linkType === "assumed" ? "🔍" : "";
+  <div class="version-carousel">
+    <button class="carousel-nav-btn carousel-nav-prev" data-carousel-id="${carouselId}" title="Previous version">
+      ‹
+    </button>
+    <div id="${carouselId}" class="version-carousel-scroll version-tabs">
+      ${versions
+        .map((v, idx) => {
+          // Check link type for this version
+          const linkType = this.getLinkType(model.path, v.path);
+          const linkIndicator =
+            linkType === "confirmed"
+              ? "✅"
+              : linkType === "assumed"
+              ? "🔍"
+              : "";
 
-        return `
-        <button
-          class="version-tab ${idx === activeVersionIdx ? "active" : ""}"
-          data-model-path="${this.escapeAttribute(model.path)}"
-          data-version-idx="${idx}"
-          title="${this.getLinkTypeTooltip(linkType, v.name)}"
-          style="
-            padding: 6px 10px;
-            background: ${
-              idx === activeVersionIdx
-                ? "linear-gradient(135deg, #bd93f9, #ff79c6)"
-                : "rgba(68, 71, 90, 0.6)"
-            };
-            border: ${idx === activeVersionIdx ? "none" : "1px solid #6272a4"};
-            border-radius: 6px;
-            color: #f8f8f2;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            white-space: nowrap;
-          "
-        >
-          ${
-            linkIndicator
-              ? `<span style="font-size: 9px;">${linkIndicator}</span>`
-              : ""
-          }
-          ${v.favorite ? '<span style="font-size: 10px;">⭐</span>' : ""}
-          ${this.escapeHtml(v.name || "Version " + (idx + 1))}
-        </button>
-      `;
-      })
-      .join("")}
+          return `
+          <button
+            class="version-tab ${idx === activeVersionIdx ? "active" : ""}"
+            data-model-path="${this.escapeAttribute(model.path)}"
+            data-version-idx="${idx}"
+            title="${this.getLinkTypeTooltip(linkType, v.name)}"
+            style="
+              padding: 6px 10px;
+              background: ${
+                idx === activeVersionIdx
+                  ? "linear-gradient(135deg, #bd93f9, #ff79c6)"
+                  : "rgba(68, 71, 90, 0.6)"
+              };
+              border: ${
+                idx === activeVersionIdx ? "none" : "1px solid #6272a4"
+              };
+              border-radius: 6px;
+              color: #f8f8f2;
+              font-size: 11px;
+              font-weight: 600;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              white-space: nowrap;
+            "
+          >
+            ${
+              linkIndicator
+                ? `<span style="font-size: 9px;">${linkIndicator}</span>`
+                : ""
+            }
+            ${v.favorite ? '<span style="font-size: 10px;">⭐</span>' : ""}
+            ${this.escapeHtml(v.name || "Version " + (idx + 1))}
+          </button>
+        `;
+        })
+        .join("")}
+    </div>
+    <button class="carousel-nav-btn carousel-nav-next" data-carousel-id="${carouselId}" title="Next version">
+      ›
+    </button>
   </div>
 </div>
 `;
@@ -1334,11 +1386,11 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
     card.innerHTML = `
     ${dropIndicator}
+    ${versionSelector}
     ${missingBadge}
     ${mismatchBadge}
     ${hashMismatchBadge}
     ${newVersionBadge}
-    ${versionSelector}
     ${mediaContainer}
     <div class="model-info">
       <div class="model-header">
@@ -1372,6 +1424,56 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       });
     });
 
+    // Add carousel navigation handlers for next/prev version selection
+    const carouselScroll = card.querySelector(".version-carousel-scroll");
+    if (carouselScroll) {
+      const prevBtn = card.querySelector(".carousel-nav-prev");
+      const nextBtn = card.querySelector(".carousel-nav-next");
+      const versionTabs = Array.from(card.querySelectorAll(".version-tab"));
+
+      const updateArrowStates = () => {
+        const activeIdx = versionTabs.findIndex((tab) =>
+          tab.classList.contains("active")
+        );
+        if (prevBtn && nextBtn) {
+          prevBtn.classList.toggle("disabled", activeIdx <= 0);
+          nextBtn.classList.toggle(
+            "disabled",
+            activeIdx >= versionTabs.length - 1
+          );
+        }
+      };
+
+      if (prevBtn) {
+        prevBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const activeIdx = versionTabs.findIndex((tab) =>
+            tab.classList.contains("active")
+          );
+          if (activeIdx > 0) {
+            versionTabs[activeIdx - 1].click();
+          }
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const activeIdx = versionTabs.findIndex((tab) =>
+            tab.classList.contains("active")
+          );
+          if (activeIdx < versionTabs.length - 1) {
+            versionTabs[activeIdx + 1].click();
+          }
+        });
+      }
+
+      // Initial arrow state
+      setTimeout(updateArrowStates, 0);
+    }
+
     card.addEventListener("click", () => {
       this.selectModel(activeVersion);
     });
@@ -1381,9 +1483,51 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
   }
 
   selectModel(model) {
-    this.selectedModel = model;
-    this.renderModelGrid(); // Re-render to update selection
-    this.renderDetails(model);
+    // Try to find which primary model this version belongs to
+    let primaryPath = null;
+    let versionIdx = -1;
+
+    // First, check if this model itself is a primary model
+    if (this.modelData.models[model.path]) {
+      const checkModel = this.modelData.models[model.path];
+      if (
+        !checkModel.relatedVersions ||
+        checkModel.relatedVersions.length === 0 ||
+        this.isPrimaryVersion({ path: model.path, ...checkModel })
+      ) {
+        primaryPath = model.path;
+        versionIdx = 0;
+      }
+    }
+
+    // If not found, search through all models to find which one lists this as a related version
+    if (primaryPath === null) {
+      for (const [path, dbModel] of Object.entries(this.modelData.models)) {
+        if (
+          dbModel.relatedVersions &&
+          dbModel.relatedVersions.includes(model.path)
+        ) {
+          // Check if this is the primary model
+          if (this.isPrimaryVersion({ path, ...dbModel })) {
+            primaryPath = path;
+            const modelWithPath = { path: primaryPath, ...dbModel };
+            const versions = this.getAllVersions(modelWithPath);
+            versionIdx = versions.findIndex((v) => v.path === model.path);
+            break;
+          }
+        }
+      }
+    }
+
+    // If we found the primary model and version index, use setActiveVersion
+    if (primaryPath && versionIdx >= 0) {
+      this.setActiveVersion(primaryPath, versionIdx);
+    } else {
+      // Fallback: direct selection
+      this.selectedModel = model;
+      this.renderModelGrid();
+      this.renderDetails(model);
+    }
   }
 
   renderDetails(model) {
@@ -1691,45 +1835,13 @@ ${
     : ""
 }
 
-<!-- Related Versions -->
+<!-- Related Versions & Links -->
 ${
   model.relatedVersions && model.relatedVersions.length > 0
     ? `
 <div class="section">
   <div class="section-header">
     <div class="section-title">🔗 Related Versions</div>
-  </div>
-  <div class="related-versions-list">
-    ${model.relatedVersions
-      .map((relPath) => {
-        const relModel = this.modelData.models[relPath];
-        if (!relModel) return "";
-
-        return `
-        <div class="related-version-item" onclick="app.selectModel(${JSON.stringify(
-          { path: relPath, ...relModel }
-        )})">
-          <span class="related-version-name">${this.escapeHtml(
-            relModel.name
-          )}</span>
-          <span class="related-version-base">${
-            relModel.baseModel || "Unknown"
-          }</span>
-        </div>
-      `;
-      })
-      .join("")}
-  </div>
-</div>
-`
-    : ""
-}
-${
-  model.relatedVersions && model.relatedVersions.length > 0
-    ? `
-<div class="section">
-  <div class="section-header">
-    <div class="section-title">🔗 Version Links</div>
   </div>
   <div class="version-link-list">
     ${model.relatedVersions
@@ -1743,7 +1855,9 @@ ${
         const isAssumed = linkType === "assumed";
 
         return `
-        <div class="version-link-item ${linkType}" style="
+        <div class="version-link-item ${linkType}" 
+          data-rel-path="${this.escapeAttribute(relPath)}"
+          style="
           padding: 12px;
           background: rgba(68, 71, 90, 0.3);
           border-left: 3px solid ${
@@ -1752,10 +1866,8 @@ ${
           border-radius: 6px;
           margin-bottom: 8px;
           cursor: pointer;
-        " onclick="app.selectModel(${JSON.stringify({
-          path: relPath,
-          ...relModel,
-        })})">
+          transition: all 0.2s ease;
+        ">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
             <span style="font-size: 16px;">${
               isConfirmed ? "✅" : isAssumed ? "🔍" : "🔗"
@@ -1764,7 +1876,10 @@ ${
               ${this.escapeHtml(relModel.name)}
             </span>
           </div>
-          <div style="font-size: 11px; color: #6272a4; margin-left: 24px;">
+          <div style="font-size: 11px; color: #8be9fd; margin-left: 24px;">
+            ${relModel.baseModel || "Unknown"}
+          </div>
+          <div style="font-size: 11px; color: #6272a4; margin-left: 24px; margin-top: 4px;">
             ${
               isConfirmed
                 ? "✅ Confirmed link (both have CivitAI data)"
@@ -1937,6 +2052,22 @@ ${
                 }
             </div>
         `;
+
+    // Add event listeners for related version items
+    setTimeout(() => {
+      const versionLinkItems = sidebar.querySelectorAll(
+        ".version-link-item[data-rel-path]"
+      );
+      versionLinkItems.forEach((item) => {
+        item.addEventListener("click", () => {
+          const relPath = item.dataset.relPath;
+          const relModel = this.modelData.models[relPath];
+          if (relModel) {
+            this.selectModel({ path: relPath, ...relModel });
+          }
+        });
+      });
+    }, 0);
   }
 
   async deleteMissingModel(path) {

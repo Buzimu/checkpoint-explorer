@@ -801,6 +801,72 @@ body {
     text-align: center;
 }
 
+/* Version Carousel Styles */
+.version-carousel {
+    position: relative;
+    padding: 0 40px; /* Space for arrows */
+}
+
+.version-carousel-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    user-select: none;
+    padding: 4px 0;
+}
+
+.version-carousel-scroll::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+.carousel-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(40, 42, 54, 0.95);
+    border: 1px solid #6272a4;
+    color: #f8f8f2;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.carousel-nav-btn:hover {
+    background: rgba(189, 147, 249, 0.8);
+    border-color: #bd93f9;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-nav-btn.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.carousel-nav-prev {
+    left: 4px;
+}
+
+.carousel-nav-next {
+    right: 4px;
+}
+
+.version-tab {
+    flex-shrink: 0; /* Prevent tabs from shrinking */
+    white-space: nowrap;
+}
+
 /* Animations */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
@@ -1830,6 +1896,17 @@ body {
   flex-direction: column;
   gap: 6px;
   margin-top: 12px;
+}
+
+.version-link-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+}
+
+.version-link-item:hover {
+  background: rgba(189, 147, 249, 0.2) !important;
+  transform: translateX(4px);
 }
 
 .related-version-item {
