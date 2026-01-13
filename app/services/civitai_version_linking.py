@@ -206,6 +206,11 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
     # Apply the links to database
     if confirmed_links or assumed_links:
         apply_version_links(db, model_path, confirmed_links, assumed_links)
+        
+        # 🆕 NEW: Synchronize all version links across the entire family
+        # This ensures all models in the family know about each other
+        synchronize_version_family(db, model_path)
+        
         save_db(db)
         
         print(f"\n✅ Linking complete:")
@@ -490,6 +495,74 @@ def apply_version_links(db, main_path, confirmed_links, assumed_links):
             'method': 'file_size',
             'sizeDiff': link['diff_pct']
         }
+
+
+def synchronize_version_family(db, model_path):
+    """
+    Synchronize version links across an entire model family
+    
+    When one model gets rescraped and creates new links, we need to ensure
+    ALL models in the family know about each other. This creates a fully
+    connected graph of version relationships.
+    
+    For example, if A links to B and C, and B already linked to D,
+    then A should also know about D, and D should know about A.
+    
+    Args:
+        db: Database dictionary
+        model_path: Path to the model that was just rescraped
+    """
+    model = db['models'].get(model_path)
+    if not model or 'relatedVersions' not in model:
+        return
+    
+    # Collect all models in this version family (BFS traversal)
+    family = set([model_path])
+    queue = list(model['relatedVersions'])
+    
+    while queue:
+        current_path = queue.pop(0)
+        
+        if current_path in family:
+            continue
+        
+        family.add(current_path)
+        
+        current_model = db['models'].get(current_path)
+        if current_model and 'relatedVersions' in current_model:
+            for related in current_model['relatedVersions']:
+                if related not in family:
+                    queue.append(related)
+    
+    print(f"   🔄 Synchronizing version family: {len(family)} models")
+    
+    # Now ensure every model in the family knows about every other model
+    for member_path in family:
+        member = db['models'].get(member_path)
+        if not member:
+            continue
+        
+        if 'relatedVersions' not in member:
+            member['relatedVersions'] = []
+        
+        # Add all other family members to this model's relatedVersions
+        for other_path in family:
+            if other_path != member_path and other_path not in member['relatedVersions']:
+                member['relatedVersions'].append(other_path)
+                
+                # Also ensure linkMetadata exists (inherit from any existing link)
+                if 'linkMetadata' not in member:
+                    member['linkMetadata'] = {}
+                
+                # If we don't have metadata for this link, mark it as confirmed
+                # (since it was found through the family graph)
+                if other_path not in member['linkMetadata']:
+                    member['linkMetadata'][other_path] = {
+                        'type': 'confirmed',
+                        'method': 'family_sync'
+                    }
+    
+    print(f"   ✅ Family synchronized: all {len(family)} models now linked")
 
 
 def upgrade_assumed_to_confirmed(db, path1, path2, model_id, version_id):

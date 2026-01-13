@@ -212,7 +212,7 @@ class BackgroundScraper:
             # ====================================================================
             # AUTO-LINK RELATED VERSIONS (after saving scraped data)
             # ====================================================================
-            from app.services.civitai_version_linking import link_versions_from_civitai_scrape
+            from app.services.civitai_version_linking import link_versions_from_civitai_scrape, detect_newer_versions
             
             try:
                 linking_result = link_versions_from_civitai_scrape(model_info['path'], scraped_data)
@@ -223,6 +223,26 @@ class BackgroundScraper:
                         print(f"🔗 Auto-linked versions: {stats.get('confirmed', 0)} confirmed, {stats.get('assumed', 0)} assumed")
             except Exception as link_error:
                 print(f"⚠️ Version linking failed: {link_error}")
+            
+            # ====================================================================
+            # AUTO-DETECT NEWER VERSIONS (after scrape)
+            # ====================================================================
+            try:
+                print(f"🔍 Checking for newer versions after background scrape...")
+                db = load_db()  # Reload to get latest links
+                newer_versions_info = detect_newer_versions(db)
+                
+                # Update the model's newVersionAvailable flag
+                if model_info['path'] in newer_versions_info:
+                    db['models'][model_info['path']]['newVersionAvailable'] = newer_versions_info[model_info['path']]
+                    print(f"   ✨ Newer version detected for {model_info['path']}")
+                elif 'newVersionAvailable' in db['models'][model_info['path']]:
+                    del db['models'][model_info['path']]['newVersionAvailable']
+                    print(f"   ✅ Model is up to date")
+                
+                save_db(db)
+            except Exception as detect_error:
+                print(f"⚠️  Newer version detection failed (non-critical): {detect_error}")
             
         except Exception as e:
             print(f"❌ Background scrape failed for {model_info['name']}: {e}")
