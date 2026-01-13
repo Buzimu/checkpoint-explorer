@@ -337,6 +337,24 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       });
     }
 
+    // 🆕 Sort versions by published date (newest first)
+    versions.sort((a, b) => {
+      const dateA = this.getModelPublishedDate(a);
+      const dateB = this.getModelPublishedDate(b);
+
+      // If both have dates, sort by date (newest first)
+      if (dateA && dateB) {
+        return new Date(dateB) - new Date(dateA);
+      }
+
+      // Models without dates go to the end
+      if (!dateA && dateB) return 1;
+      if (dateA && !dateB) return -1;
+
+      // If neither has a date, maintain current order
+      return 0;
+    });
+
     return versions;
   }
 
@@ -2044,6 +2062,12 @@ ${
     /**
      * Determine if this model is the "primary" in its version group
      * Returns true if this model should be rendered, false if it should be hidden
+     *
+     * Primary selection rules (in order):
+     * 1. 🆕 Newest published date (most recent version)
+     * 2. Model with most relatedVersions (the hub)
+     * 3. Model with civitaiUrl (confirmed linking)
+     * 4. Alphabetically first path
      */
 
     // If no related versions, it's always primary
@@ -2059,12 +2083,34 @@ ${
       }
     });
 
-    // Determine which model is "most primary" using these rules:
-    // 1. Model with most relatedVersions (the hub)
-    // 2. Model with civitaiUrl (confirmed linking)
-    // 3. Alphabetically first path
-
+    // 🆕 RULE 1: Find the newest model by published date
     let primaryPath = model.path;
+    let newestDate = this.getModelPublishedDate(model);
+
+    versionGroup.forEach((path) => {
+      if (path === model.path) return; // Skip self
+
+      const otherModel = this.modelData.models[path];
+      if (!otherModel) return;
+
+      const otherDate = this.getModelPublishedDate(otherModel);
+
+      // If the other model is newer, it becomes primary
+      if (
+        otherDate &&
+        (!newestDate || new Date(otherDate) > new Date(newestDate))
+      ) {
+        primaryPath = path;
+        newestDate = otherDate;
+      }
+    });
+
+    // If we found a model with a date, use it
+    if (newestDate) {
+      return primaryPath === model.path;
+    }
+
+    // FALLBACK: Use old logic if no dates are available
     let maxRelated = model.relatedVersions.length;
 
     versionGroup.forEach((path) => {
@@ -2102,6 +2148,41 @@ ${
 
     // This model is primary only if it's the one we selected
     return model.path === primaryPath;
+  }
+
+  /**
+   * 🆕 Get the published date for a model
+   * Checks multiple sources in order of priority:
+   * 1. CivitAI version data (most accurate)
+   * 2. CivitAI scraped data versions
+   * 3. File modification date (last resort)
+   */
+  getModelPublishedDate(model) {
+    // Priority 1: Check if the model has CivitAI data with version info
+    if (model.civitaiData && model.civitaiData.versions) {
+      // Find the version that matches this model's versionId
+      const versionId = model.civitaiVersionId;
+      if (versionId) {
+        const version = model.civitaiData.versions.find(
+          (v) => v.id === versionId
+        );
+        if (version && (version.publishedAt || version.createdAt)) {
+          return version.publishedAt || version.createdAt;
+        }
+      }
+
+      // If no specific version found, try to get the most recent date from any version
+      for (const version of model.civitaiData.versions) {
+        if (version.publishedAt || version.createdAt) {
+          return version.publishedAt || version.createdAt;
+        }
+      }
+    }
+
+    // Priority 2: Check file modification date (fallback)
+    // This would require the database to store file modification dates
+    // For now, return null if no CivitAI date is available
+    return null;
   }
 
   async toggleFavorite(path) {

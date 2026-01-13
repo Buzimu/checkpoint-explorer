@@ -321,7 +321,9 @@ class CivitAIService:
                 'trainedWords': version.get('trainedWords', []),
                 'available': version.get('status') == 'Published',
                 'files': files,  # Now includes hashes for definitive matching!
-                'baseModel': version.get('baseModel', 'Unknown')
+                'baseModel': version.get('baseModel', 'Unknown'),
+                'publishedAt': version.get('publishedAt') or version.get('createdAt'),  # 🆕 Capture published/created date
+                'createdAt': version.get('createdAt')  # 🆕 Also store creation date as backup
             }
             versions.append(version_info)
         
