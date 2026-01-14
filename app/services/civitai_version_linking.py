@@ -730,15 +730,40 @@ def detect_newer_versions(db):
         except (ValueError, AttributeError):
             continue
         
-        # Check all versions for newer ones
+        # Find the newest version date among all owned versions (current + related)
+        owned_version_dates = [current_date]
+        owned_version_ids = {str(current_version_id)}
+        
+        # Check related versions for their dates
+        if model.get('relatedVersions'):
+            for related_path in model['relatedVersions']:
+                related_model = db['models'].get(related_path)
+                if related_model and related_model.get('civitaiVersionId'):
+                    related_vid = str(related_model['civitaiVersionId'])
+                    owned_version_ids.add(related_vid)
+                    
+                    # Find this version's date in civitaiData
+                    for version in civitai_data['versions']:
+                        if str(version.get('id')) == related_vid:
+                            try:
+                                rel_date = datetime.fromisoformat(version.get('publishedAt', '').replace('Z', '+00:00'))
+                                owned_version_dates.append(rel_date)
+                            except (ValueError, AttributeError):
+                                pass
+                            break
+        
+        # Get the newest owned version date
+        newest_owned_date = max(owned_version_dates)
+        
+        # Check all versions for ones newer than our newest owned version
         newer_versions = []
         
         for version in civitai_data['versions']:
             version_id = str(version.get('id'))
             version_published = version.get('publishedAt')
             
-            # Skip if this is the current version
-            if version_id == str(current_version_id):
+            # Skip if we already own this version
+            if version_id in owned_version_ids:
                 continue
             
             if not version_published:
@@ -747,8 +772,8 @@ def detect_newer_versions(db):
             try:
                 version_date = datetime.fromisoformat(version_published.replace('Z', '+00:00'))
                 
-                # Check if this version is newer
-                if version_date > current_date:
+                # Check if this version is newer than our newest owned version
+                if version_date > newest_owned_date:
                     newer_versions.append({
                         'versionId': version_id,
                         'versionName': version.get('name', 'Unknown'),
