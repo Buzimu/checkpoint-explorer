@@ -21,6 +21,8 @@ class ModelExplorer {
         "vae",
         "embedding",
         "hypernetwork",
+        "clip",
+        "ipadapter",
         "unknown",
       ],
       baseModels: [
@@ -51,6 +53,8 @@ class ModelExplorer {
       "vae",
       "embedding",
       "hypernetwork",
+      "clip",
+      "ipadapter",
     ];
     this.VALID_BASES = [
       "SD1.5",
@@ -2199,6 +2203,12 @@ ${
                         <option value="hypernetwork" ${
                           model.modelType === "hypernetwork" ? "selected" : ""
                         }>Hypernetwork</option>
+                        <option value="clip" ${
+                          model.modelType === "clip" ? "selected" : ""
+                        }>CLIP</option>
+                        <option value="ipadapter" ${
+                          model.modelType === "ipadapter" ? "selected" : ""
+                        }>IP-Adapter</option>
                     </select>
                 </div>
 
@@ -3863,6 +3873,7 @@ ${
       embedding: "📦",
       hypernetwork: "🧠",
       clip: "📎",
+      ipadapter: "🖼️",
       diffusion: "🌊",
     };
     return icons[type] || "📄";
