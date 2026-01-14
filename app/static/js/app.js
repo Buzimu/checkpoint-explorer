@@ -1747,7 +1747,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
                         ? `
                     <div class="info-item">
                       <span class="info-label">File Hash</span>
-                      <span class="info-value" style="font-size: 10px; font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                      <span class="info-value" style="font-size: 12px; font-family: monospace; display: flex; align-items: center; gap: 8px;">
                         ${model.fileHash}
                         <a href="https://civarchive.com/sha256/${model.fileHash}" 
                           target="_blank" 
