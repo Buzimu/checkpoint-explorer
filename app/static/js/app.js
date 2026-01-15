@@ -1008,9 +1008,10 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           !this.VALID_BASES.includes(baseModel);
 
         // Check for missing links
-        const hasMissingLink = !model.civitaiUrl && 
-          !model.huggingFaceUrl && 
-          !model.githubUrl && 
+        const hasMissingLink =
+          !model.civitaiUrl &&
+          !model.huggingFaceUrl &&
+          !model.githubUrl &&
           !model.otherUrl;
 
         // Tag model with mismatch status
@@ -1074,7 +1075,8 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const showMismatchOnly = document.getElementById("mismatchFilter").checked;
     const showHashMismatchOnly =
       document.getElementById("hashMismatchFilter").checked;
-    const showMissingLinkOnly = document.getElementById("missingLinkFilter").checked;
+    const showMissingLinkOnly =
+      document.getElementById("missingLinkFilter").checked;
 
     console.log("Filter settings:", {
       searchTerm,
@@ -1102,9 +1104,10 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           !this.VALID_BASES.includes(baseModel);
 
         // Check for missing links
-        const hasMissingLink = !model.civitaiUrl && 
-          !model.huggingFaceUrl && 
-          !model.githubUrl && 
+        const hasMissingLink =
+          !model.civitaiUrl &&
+          !model.huggingFaceUrl &&
+          !model.githubUrl &&
           !model.otherUrl;
 
         return {
