@@ -5,7 +5,7 @@ UPDATED VERSION - Extracts file sizes for version matching
 import re
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import json
 
@@ -59,6 +59,48 @@ class CivitAIService:
     def get_activity_log(self):
         """Get recent activity log"""
         return self.activity_log
+    
+    def get_upcoming_tasks(self):
+        """
+        Get list of upcoming scheduled tasks
+        Returns list of upcoming tasks with estimated execution times
+        """
+        from app.services.background_scraper import get_background_scraper
+        
+        upcoming = []
+        now = datetime.now()
+        scraper = get_background_scraper()
+        
+        # Calculate next scrape time (based on rate limit)
+        if self.last_scrape_time:
+            next_scrape = self.last_scrape_time + timedelta(seconds=self.rate_limit_delay)
+            if next_scrape > now:
+                seconds_until = (next_scrape - now).total_seconds()
+                upcoming.append({
+                    'task': 'CivitAI Scrape',
+                    'description': 'Next model scrape',
+                    'scheduledTime': next_scrape.isoformat(),
+                    'secondsUntil': int(seconds_until),
+                    'type': 'scheduled'
+                })
+        
+        # Calculate next media audit
+        if hasattr(scraper, 'last_media_audit') and scraper.last_media_audit:
+            next_audit = scraper.last_media_audit + timedelta(seconds=scraper.media_audit_interval)
+            if next_audit > now:
+                seconds_until = (next_audit - now).total_seconds()
+                upcoming.append({
+                    'task': 'Media Audit',
+                    'description': 'Scheduled media verification',
+                    'scheduledTime': next_audit.isoformat(),
+                    'secondsUntil': int(seconds_until),
+                    'type': 'scheduled'
+                })
+        
+        # Sort by scheduled time
+        upcoming.sort(key=lambda x: x['secondsUntil'])
+        
+        return upcoming
     
     def extract_ids_from_url(self, url):
         """

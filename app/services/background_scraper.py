@@ -19,6 +19,8 @@ class BackgroundScraper:
         self.daily_limit = 1000  # Max scrapes per day
         self.scrapes_today = 0
         self.last_reset = datetime.now().date()
+        self.media_audit_interval = 300  # Run media audit every 5 minutes (300 seconds)
+        self.last_media_audit = None  # Track when we last ran media audit
     
     def start(self):
         """Start the background scraping thread"""
@@ -46,6 +48,53 @@ class BackgroundScraper:
             self.last_reset = today
             print(f"📅 Daily scrape counter reset (limit: {self.daily_limit})")
     
+    def _check_media_audit(self):
+        """Check if it's time to run periodic media audit"""
+        now = datetime.now()
+        
+        if self.last_media_audit is None:
+            # First run - do it now
+            self._run_full_media_audit()
+            self.last_media_audit = now
+            return
+        
+        elapsed = (now - self.last_media_audit).total_seconds()
+        if elapsed >= self.media_audit_interval:
+            self._run_full_media_audit()
+            self.last_media_audit = now
+    
+    def _run_full_media_audit(self):
+        """Run full media audit across all models"""
+        try:
+            from app.services.media_auditor import audit_all_media
+            from app.services.civitai import get_civitai_service
+            
+            print("\n🔍 Running scheduled full media audit...")
+            db = load_db()
+            audit_results = audit_all_media(db)
+            
+            total_added = audit_results.get('total_added', 0)
+            total_removed = audit_results.get('total_removed', 0)
+            total_verified = audit_results.get('total_verified', 0)
+            
+            if total_added > 0 or total_removed > 0:
+                save_db(db)
+                print(f"✅ Media audit complete: verified={total_verified}, removed={total_removed}, added={total_added}")
+                
+                # Log activity
+                service = get_civitai_service()
+                details = f"verified={total_verified}, removed={total_removed}, added={total_added}"
+                service.log_activity('Media Audit', 'All Models', 'success', details)
+            else:
+                print(f"✅ Media audit complete: all {total_verified} files verified")
+        except Exception as e:
+            print(f"❌ Scheduled media audit failed: {e}")
+            try:
+                service = get_civitai_service()
+                service.log_activity('Media Audit', 'All Models', 'error', str(e))
+            except:
+                pass
+    
     def _scrape_loop(self):
         """Main scraping loop - runs in background thread"""
         print("🔄 Background scraping loop started")
@@ -54,6 +103,9 @@ class BackgroundScraper:
             try:
                 # Reset counter if new day
                 self._reset_daily_counter()
+                
+                # Check if we need to run periodic media audit
+                self._check_media_audit()
                 
                 # Check if we've hit daily limit
                 if self.scrapes_today >= self.daily_limit:
@@ -236,6 +288,10 @@ class BackgroundScraper:
                 if model_info['path'] in newer_versions_info:
                     db['models'][model_info['path']]['newVersionAvailable'] = newer_versions_info[model_info['path']]
                     print(f"   ✨ Newer version detected for {model_info['path']}")
+                    
+                    # Log activity
+                    service = get_civitai_service()
+                    service.log_activity('Newer Version Found', model_info['name'], 'success', 'Update available')
                 elif 'newVersionAvailable' in db['models'][model_info['path']]:
                     del db['models'][model_info['path']]['newVersionAvailable']
                     print(f"   ✅ Model is up to date")

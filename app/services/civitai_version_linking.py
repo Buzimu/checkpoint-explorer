@@ -5,6 +5,7 @@ Links versions when CivitAI data is scraped, not as standalone operation
 BUGFIX: Prevents false positive linking by checking BOTH civitaiModelId AND civitaiUrl
 """
 from app.services.database import load_db, save_db
+from app.services.civitai import get_civitai_service
 import re
 
 
@@ -225,6 +226,17 @@ def link_versions_from_civitai_scrape(model_path, scraped_data):
         print(f"   Assumed links: {len(assumed_links)}")
     else:
         print(f"\n   No versions found locally")
+    
+    # Log activity if any links were created
+    if confirmed_links or assumed_links:
+        try:
+            service = get_civitai_service()
+            model_name = current_model.get('name', 'Unknown')
+            total_links = len(confirmed_links) + len(assumed_links)
+            details = f"{len(confirmed_links)} confirmed, {len(assumed_links)} assumed"
+            service.log_activity('Link Versions', model_name, 'success', details)
+        except Exception as e:
+            print(f"⚠️  Failed to log linking activity: {e}")
     
     return {
         'confirmed': confirmed_links,

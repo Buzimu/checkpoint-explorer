@@ -468,18 +468,59 @@ def trigger_scan():
 def get_activity_log():
     """
     Get recent activity from the CivitAI scraping service
+    Now also includes upcoming scheduled tasks
     """
     try:
         service = get_civitai_service()
         activities = service.get_activity_log()
+        upcoming = service.get_upcoming_tasks()
         
         return jsonify({
             'success': True,
             'activities': activities,
+            'upcoming': upcoming,
             'count': len(activities)
         })
     except Exception as e:
         print(f"❌ Failed to get activity log: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/reset-scrape-cooldowns', methods=['POST'])
+def reset_scrape_cooldowns():
+    """
+    Reset all scrape cooldown timers (lastError timestamps)
+    This makes all models eligible for immediate scraping
+    Called after JSON import to refresh data
+    """
+    try:
+        db = load_db()
+        reset_count = 0
+        
+        for model_path, model in db['models'].items():
+            if 'civitaiData' in model and 'lastError' in model['civitaiData']:
+                del model['civitaiData']['lastError']
+                if 'lastErrorMessage' in model['civitaiData']:
+                    del model['civitaiData']['lastErrorMessage']
+                reset_count += 1
+        
+        if save_db(db):
+            print(f"✅ Reset scrape cooldowns for {reset_count} models")
+            return jsonify({
+                'success': True,
+                'reset_count': reset_count
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to save database'
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ Failed to reset scrape cooldowns: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -892,63 +933,3 @@ def delete_media_file(filename):
             'error': str(e)
         }), 500
 
-
-@bp.route('/audit-media', methods=['POST'])
-def audit_media():
-    """
-    Manually trigger a full media audit
-    
-    Scans all media files and:
-    1. Removes references to missing files
-    2. Re-associates orphaned media based on hash matching
-    
-    Optional parameters:
-    {
-        "modelPath": "path/to/model.safetensors"  // Audit single model only
-    }
-    """
-    try:
-        from app.services.media_auditor import audit_all_media, audit_media_for_model
-        
-        data = request.json or {}
-        model_path = data.get('modelPath')
-        
-        db = load_db()
-        
-        if model_path:
-            # Audit single model
-            if model_path not in db['models']:
-                return jsonify({'success': False, 'error': 'Model not found'}), 404
-            
-            print(f"\n🔍 Auditing media for: {model_path}")
-            model_stats = audit_media_for_model(db, model_path, db['models'][model_path])
-            
-            if save_db(db):
-                return jsonify({
-                    'success': True,
-                    'stats': model_stats,
-                    'modelPath': model_path
-                })
-            else:
-                return jsonify({'success': False, 'error': 'Failed to save database'}), 500
-        else:
-            # Audit all models
-            result = audit_all_media(db)
-            
-            if save_db(db):
-                return jsonify({
-                    'success': True,
-                    'stats': result['stats'],
-                    'details': result['details']
-                })
-            else:
-                return jsonify({'success': False, 'error': 'Failed to save database'}), 500
-        
-    except Exception as e:
-        print(f"❌ Media audit failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500

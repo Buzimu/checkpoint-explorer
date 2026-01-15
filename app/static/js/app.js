@@ -78,7 +78,7 @@ class ModelExplorer {
 
       const result = await response.json();
       if (result.success) {
-        this.updateActivityTicker(result.activities);
+        this.updateActivityTicker(result.activities, result.upcoming || []);
       }
     } catch (error) {
       console.error("Failed to load activity log:", error);
@@ -222,7 +222,7 @@ class ModelExplorer {
     // Start activity log polling
     setInterval(() => {
       this.loadActivityLog();
-    }, 30000); // Update every 30 seconds
+    }, 5000); // Update every 5 seconds
 
     // Load immediately
     this.loadActivityLog();
@@ -489,42 +489,22 @@ class ModelExplorer {
     this.updateGalleryFilters();
   }
 
-  async auditMedia() {
+  async resetScrapeCooldowns() {
     try {
-      this.showToast("⏳ Auditing media files...");
+      console.log("🔄 Resetting scrape cooldowns...");
 
-      const response = await fetch("/api/audit-media", {
+      const response = await fetch("/api/reset-scrape-cooldowns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log("🔍 Media Audit Results:", result);
-
-        const stats = result.stats;
-        let message = `✅ Media Audit Complete!\n\n`;
-        message += `📊 Results:\n`;
-        message += `  • Models audited: ${stats.models_audited}\n`;
-        message += `  • Media verified: ${stats.media_verified}\n`;
-        message += `  • Invalid references removed: ${stats.references_removed}\n`;
-        message += `  • Orphaned media re-associated: ${stats.media_re_associated}\n`;
-        message += `  • Files renamed to standard format: ${stats.media_renamed}`;
-
-        this.showToast(message);
-
-        // Reload to show updated media associations
-        await this.loadFromServer();
+        console.log("✅ Scrape cooldowns reset");
       } else {
-        const error = await response.json();
-        this.showToast(
-          `❌ Media audit failed: ${error.error || "Unknown error"}`
-        );
+        console.warn("⚠️ Failed to reset scrape cooldowns");
       }
     } catch (error) {
-      console.error("Media audit failed:", error);
-      this.showToast("❌ Media audit failed: " + error.message);
+      console.error("Failed to reset scrape cooldowns:", error);
     }
   }
 
@@ -681,16 +661,15 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     });
   }
 
-  updateActivityTicker(activities) {
+  updateActivityTicker(activities, upcoming = []) {
     const tickerContent = document.getElementById("tickerContent");
     const tickerQueue = document.getElementById("tickerQueue");
-    
+
     if (!tickerContent || !tickerQueue) return;
 
     // Update the main ticker with the current active task
-    if (activities.length === 0) {
+    if (activities.length === 0 && upcoming.length === 0) {
       tickerContent.innerHTML = `
-        <span class="ticker-icon">💤</span>
         <span class="ticker-text">No active tasks</span>
       `;
       tickerQueue.innerHTML = `
@@ -700,34 +679,80 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       return;
     }
 
-    // Get the most recent activity (current task)
-    const currentActivity = activities[0];
-    const statusIcon = this.getActivityIcon(currentActivity);
-    const statusClass = currentActivity.status === "success" ? "success" : 
-                       currentActivity.status === "error" ? "error" : "pending";
-    
-    // Update main ticker display
-    const tickerText = `${currentActivity.action}: ${currentActivity.modelName}`;
-    const textElement = `<span class="ticker-text ${tickerText.length > 50 ? 'scrolling' : ''}">${tickerText}</span>`;
-    
-    tickerContent.innerHTML = `
-      <span class="ticker-icon">${statusIcon}</span>
-      ${textElement}
-    `;
-
-    // Build the queue display
-    let queueHTML = '<div class="ticker-queue-header">Task Queue</div>';
-    
+    // Determine what to show in main ticker
+    let tickerText = "";
     if (activities.length > 0) {
+      const currentActivity = activities[0];
+      tickerText = `${currentActivity.action}: ${currentActivity.modelName}`;
+    } else if (upcoming.length > 0) {
+      const nextTask = upcoming[0];
+      const minutes = Math.floor(nextTask.secondsUntil / 60);
+      const seconds = nextTask.secondsUntil % 60;
+      const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+      tickerText = `Next: ${nextTask.task} in ${timeStr}`;
+    }
+
+    // Update main ticker display
+    const textElement = `<span class="ticker-text ${
+      tickerText.length > 50 ? "scrolling" : ""
+    }">${tickerText}</span>`;
+
+    tickerContent.innerHTML = textElement;
+
+    // Build the queue display with BOTH history and upcoming
+    let queueHTML = "";
+
+    // Upcoming tasks section
+    if (upcoming.length > 0) {
+      queueHTML += '<div class="ticker-queue-header">Upcoming Tasks</div>';
+      upcoming.forEach((task) => {
+        const minutes = Math.floor(task.secondsUntil / 60);
+        const seconds = task.secondsUntil % 60;
+        const timeStr =
+          minutes > 0 ? `in ${minutes}m ${seconds}s` : `in ${seconds}s`;
+
+        queueHTML += `
+          <div class="ticker-queue-item pending">
+            <div class="ticker-queue-time">${timeStr}</div>
+            <div class="ticker-queue-content">
+              <span class="ticker-queue-icon">⏱️</span>
+              <div class="ticker-queue-text">
+                <strong>${task.task}</strong>
+                <span class="ticker-queue-status pending">scheduled</span>
+                ${
+                  task.description
+                    ? `<div class="ticker-queue-details">${task.description}</div>`
+                    : ""
+                }
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // Recent activity section
+    if (activities.length > 0) {
+      queueHTML += '<div class="ticker-queue-header">Recent Activity</div>';
       activities.forEach((activity, index) => {
         const time = new Date(activity.timestamp).toLocaleTimeString();
         const icon = this.getActivityIcon(activity);
-        const itemStatusClass = activity.status === "success" ? "success" : 
-                               activity.status === "error" ? "error" : 
-                               index === 0 ? "active" : "pending";
-        const statusBadge = index === 0 ? "running" : 
-                           activity.status === "success" ? "completed" :
-                           activity.status === "error" ? "failed" : "pending";
+        const itemStatusClass =
+          activity.status === "success"
+            ? "success"
+            : activity.status === "error"
+            ? "error"
+            : index === 0
+            ? "active"
+            : "pending";
+        const statusBadge =
+          index === 0
+            ? "running"
+            : activity.status === "success"
+            ? "completed"
+            : activity.status === "error"
+            ? "failed"
+            : "pending";
 
         queueHTML += `
           <div class="ticker-queue-item ${itemStatusClass}">
@@ -737,12 +762,24 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
               <div class="ticker-queue-text">
                 <strong>${activity.action}</strong>: ${activity.modelName}
                 <span class="ticker-queue-status ${statusBadge}">${statusBadge}</span>
-                ${activity.details ? `<div class="ticker-queue-details">${activity.details}</div>` : ''}
+                ${
+                  activity.details
+                    ? `<div class="ticker-queue-details">${activity.details}</div>`
+                    : ""
+                }
               </div>
             </div>
           </div>
         `;
       });
+    }
+
+    // If nothing to show
+    if (queueHTML === "") {
+      queueHTML = `
+        <div class="ticker-queue-header">Task Queue</div>
+        <div class="ticker-queue-empty">No tasks</div>
+      `;
     }
 
     tickerQueue.innerHTML = queueHTML;
@@ -751,13 +788,17 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
   getActivityIcon(activity) {
     if (activity.status === "success") return "✅";
     if (activity.status === "error") return "❌";
-    
+
     // Default icons based on action type
-    if (activity.action && activity.action.toLowerCase().includes("scrape")) return "🔍";
-    if (activity.action && activity.action.toLowerCase().includes("download")) return "⬇️";
-    if (activity.action && activity.action.toLowerCase().includes("update")) return "🔄";
-    if (activity.action && activity.action.toLowerCase().includes("scan")) return "📊";
-    
+    if (activity.action && activity.action.toLowerCase().includes("scrape"))
+      return "🔍";
+    if (activity.action && activity.action.toLowerCase().includes("download"))
+      return "⬇️";
+    if (activity.action && activity.action.toLowerCase().includes("update"))
+      return "🔄";
+    if (activity.action && activity.action.toLowerCase().includes("scan"))
+      return "📊";
+
     return "⚙️"; // Default gear icon
   }
 
@@ -3467,6 +3508,9 @@ ${
       }
 
       console.log("💾 Merge saved successfully");
+
+      // Reset all scrape cooldowns so models can be scraped immediately
+      await this.resetScrapeCooldowns();
 
       await this.loadFromServer();
 
