@@ -78,7 +78,7 @@ class ModelExplorer {
 
       const result = await response.json();
       if (result.success) {
-        this.updateActivityButton(result.activities);
+        this.updateActivityTicker(result.activities);
       }
     } catch (error) {
       console.error("Failed to load activity log:", error);
@@ -681,41 +681,84 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     });
   }
 
-  updateActivityButton(activities) {
-    const btn = document.getElementById("activityBtn");
-    if (!btn) return;
+  updateActivityTicker(activities) {
+    const tickerContent = document.getElementById("tickerContent");
+    const tickerQueue = document.getElementById("tickerQueue");
+    
+    if (!tickerContent || !tickerQueue) return;
 
-    // Update tooltip with activities
-    let tooltip = '<div class="activity-log-tooltip">';
-    tooltip += '<div class="activity-log-header">Recent Activity</div>';
-
+    // Update the main ticker with the current active task
     if (activities.length === 0) {
-      tooltip += '<div class="activity-log-empty">No recent activity</div>';
-    } else {
-      activities.forEach((activity) => {
-        const time = new Date(activity.timestamp).toLocaleTimeString();
-        const icon = activity.status === "success" ? "✅" : "❌";
-        const statusClass = activity.status === "success" ? "success" : "error";
-
-        tooltip += `
-        <div class="activity-log-item ${statusClass}">
-          <div class="activity-log-time">${time}</div>
-          <div class="activity-log-content">
-            ${icon} ${activity.action}: ${activity.modelName}
-            ${
-              activity.details
-                ? `<div class="activity-log-details">${activity.details}</div>`
-                : ""
-            }
-          </div>
-        </div>
+      tickerContent.innerHTML = `
+        <span class="ticker-icon">💤</span>
+        <span class="ticker-text">No active tasks</span>
       `;
+      tickerQueue.innerHTML = `
+        <div class="ticker-queue-header">Task Queue</div>
+        <div class="ticker-queue-empty">No pending tasks</div>
+      `;
+      return;
+    }
+
+    // Get the most recent activity (current task)
+    const currentActivity = activities[0];
+    const statusIcon = this.getActivityIcon(currentActivity);
+    const statusClass = currentActivity.status === "success" ? "success" : 
+                       currentActivity.status === "error" ? "error" : "pending";
+    
+    // Update main ticker display
+    const tickerText = `${currentActivity.action}: ${currentActivity.modelName}`;
+    const textElement = `<span class="ticker-text ${tickerText.length > 50 ? 'scrolling' : ''}">${tickerText}</span>`;
+    
+    tickerContent.innerHTML = `
+      <span class="ticker-icon">${statusIcon}</span>
+      ${textElement}
+    `;
+
+    // Build the queue display
+    let queueHTML = '<div class="ticker-queue-header">Task Queue</div>';
+    
+    if (activities.length > 0) {
+      activities.forEach((activity, index) => {
+        const time = new Date(activity.timestamp).toLocaleTimeString();
+        const icon = this.getActivityIcon(activity);
+        const itemStatusClass = activity.status === "success" ? "success" : 
+                               activity.status === "error" ? "error" : 
+                               index === 0 ? "active" : "pending";
+        const statusBadge = index === 0 ? "running" : 
+                           activity.status === "success" ? "completed" :
+                           activity.status === "error" ? "failed" : "pending";
+
+        queueHTML += `
+          <div class="ticker-queue-item ${itemStatusClass}">
+            <div class="ticker-queue-time">${time}</div>
+            <div class="ticker-queue-content">
+              <span class="ticker-queue-icon">${icon}</span>
+              <div class="ticker-queue-text">
+                <strong>${activity.action}</strong>: ${activity.modelName}
+                <span class="ticker-queue-status ${statusBadge}">${statusBadge}</span>
+                ${activity.details ? `<div class="ticker-queue-details">${activity.details}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
       });
     }
 
-    tooltip += "</div>";
+    tickerQueue.innerHTML = queueHTML;
+  }
 
-    btn.setAttribute("data-tooltip", tooltip);
+  getActivityIcon(activity) {
+    if (activity.status === "success") return "✅";
+    if (activity.status === "error") return "❌";
+    
+    // Default icons based on action type
+    if (activity.action && activity.action.toLowerCase().includes("scrape")) return "🔍";
+    if (activity.action && activity.action.toLowerCase().includes("download")) return "⬇️";
+    if (activity.action && activity.action.toLowerCase().includes("update")) return "🔄";
+    if (activity.action && activity.action.toLowerCase().includes("scan")) return "📊";
+    
+    return "⚙️"; // Default gear icon
   }
 
   resetFiltersToDefaults() {

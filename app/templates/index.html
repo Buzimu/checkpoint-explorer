@@ -12,6 +12,17 @@
       <div class="header-left">
         <h1 class="app-title">🎨 ComfyUI Model Explorer</h1>
         <span class="model-count" id="modelCount">0 models</span>
+        <!-- Activity News Ticker -->
+        <div class="activity-ticker" id="activityTicker">
+          <div class="ticker-content" id="tickerContent">
+            <span class="ticker-icon">💤</span>
+            <span class="ticker-text">No active tasks</span>
+          </div>
+          <div class="ticker-queue" id="tickerQueue">
+            <div class="ticker-queue-header">Task Queue</div>
+            <div class="ticker-queue-empty">No pending tasks</div>
+          </div>
+        </div>
       </div>
       <div class="header-right">
         <button class="btn btn-primary" id="loadJsonBtn">🔄 Reload</button>
@@ -56,18 +67,6 @@
           title="Showing images only (click to include videos)"
         >
           🖼️ Images
-        </button>
-
-        <button
-          class="btn btn-icon btn-activity"
-          id="activityBtn"
-          title="Recent Activity"
-        >
-          📊
-          <div class="activity-log-tooltip" id="activityTooltip">
-            <div class="activity-log-header">Recent Activity</div>
-            <div class="activity-log-empty">Hover to see recent activity</div>
-          </div>
         </button>
       </div>
     </header>
