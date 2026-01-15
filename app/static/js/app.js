@@ -43,6 +43,7 @@ class ModelExplorer {
       showMissing: false, // NEW: Filter for missing models
       showMismatch: false, // NEW: Filter for mismatched models
       showHashMismatch: false, // 🆕 NEW
+      showMissingLink: false, // NEW: Filter for models without any URL links
     };
 
     // BUGFIX #4: Define valid types and bases for mismatch detection
@@ -181,6 +182,13 @@ class ModelExplorer {
       .getElementById("hashMismatchFilter")
       .addEventListener("change", () => {
         console.log("🚨 Hash mismatch filter changed");
+        this.applyFilters();
+      });
+
+    document
+      .getElementById("missingLinkFilter")
+      .addEventListener("change", () => {
+        console.log("🔗 Missing link filter changed");
         this.applyFilters();
       });
 
@@ -843,6 +851,8 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       this.DEFAULT_FILTERS.showMissing;
     document.getElementById("mismatchFilter").checked =
       this.DEFAULT_FILTERS.showMismatch;
+    document.getElementById("missingLinkFilter").checked =
+      this.DEFAULT_FILTERS.showMissingLink;
 
     console.log("✅ Filters reset to defaults");
   }
@@ -997,6 +1007,12 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           baseModel !== "unknown" &&
           !this.VALID_BASES.includes(baseModel);
 
+        // Check for missing links
+        const hasMissingLink = !model.civitaiUrl && 
+          !model.huggingFaceUrl && 
+          !model.githubUrl && 
+          !model.otherUrl;
+
         // Tag model with mismatch status
         const modelWithFlags = {
           path,
@@ -1004,6 +1020,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           _hasMismatch: hasTypeMismatch || hasBaseMismatch,
           _typeMismatch: hasTypeMismatch,
           _baseMismatch: hasBaseMismatch,
+          _hasMissingLink: hasMissingLink,
         };
 
         if (hasTypeMismatch || hasBaseMismatch) {
@@ -1057,6 +1074,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const showMismatchOnly = document.getElementById("mismatchFilter").checked;
     const showHashMismatchOnly =
       document.getElementById("hashMismatchFilter").checked;
+    const showMissingLinkOnly = document.getElementById("missingLinkFilter").checked;
 
     console.log("Filter settings:", {
       searchTerm,
@@ -1083,6 +1101,12 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           baseModel !== "unknown" &&
           !this.VALID_BASES.includes(baseModel);
 
+        // Check for missing links
+        const hasMissingLink = !model.civitaiUrl && 
+          !model.huggingFaceUrl && 
+          !model.githubUrl && 
+          !model.otherUrl;
+
         return {
           path,
           ...model,
@@ -1090,6 +1114,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           _typeMismatch: hasTypeMismatch,
           _baseMismatch: hasBaseMismatch,
           _hasHashMismatch: model.hashMismatch?.detected || false,
+          _hasMissingLink: hasMissingLink,
         };
       })
       .filter((model) => {
@@ -1214,6 +1239,11 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           return false;
         }
 
+        // Missing link filter
+        if (showMissingLinkOnly && !model._hasMissingLink) {
+          return false;
+        }
+
         // BUGFIX #8: Keep all models in filteredModels for accurate counting
         // Secondary versions will be filtered during rendering, not here
         return true;
@@ -1276,6 +1306,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const isMismatch = model._hasMismatch;
     const hasHashMismatch = model.hashMismatch?.detected; // 🆕 NEW
     const hasNewerVersion = model.newVersionAvailable?.hasNewerVersion; // 🆕 NEW VERSION BADGE
+    const hasMissingLink = model._hasMissingLink; // NEW: Missing link detection
 
     if (!this.canShowModel(model)) {
       return null;
@@ -1374,6 +1405,10 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     // 🆕 NEW VERSION BADGE: Indicates newer version available
     const newVersionBadge = hasNewerVersion
       ? `<div class="new-version-badge" style="top: ${badgeTopOffset}px;">✨ NEW VERSION</div>`
+      : "";
+    // Missing link badge
+    const missingLinkBadge = hasMissingLink
+      ? `<div class="missing-link-badge" style="top: ${badgeTopOffset}px;">🔗</div>`
       : "";
 
     // Version selector (carousel)
@@ -1481,6 +1516,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     ${mismatchBadge}
     ${hashMismatchBadge}
     ${newVersionBadge}
+    ${missingLinkBadge}
     ${mediaContainer}
     <div class="model-info">
       <div class="model-header">
@@ -3572,6 +3608,7 @@ ${
 
       let oldModel = null;
 
+      // Try to match by hash first
       if (oldByHash.has(hash)) {
         oldModel = oldByHash.get(hash).model;
       } else if (newModel.variants) {
@@ -3586,6 +3623,12 @@ ${
         ) {
           oldModel = oldByHash.get(newModel.variants.lowHash).model;
         }
+      }
+
+      // Fallback: Try to match by path if hash matching failed
+      if (!oldModel && oldDb.models[newPath]) {
+        oldModel = oldDb.models[newPath];
+        console.log("📍 Matched by path (hash mismatch):", newPath);
       }
 
       if (oldModel) {
