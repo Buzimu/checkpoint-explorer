@@ -26,11 +26,12 @@ class ModelExplorer {
         "unknown",
       ],
       baseModels: [
-        "SD1.5",
-        "SDXL",
+        "SD 1.5",
+        "SDXL 1.0",
         "Flux",
         "Pony",
         "Illustrious",
+        "Qwen",
         "WAN 2.1",
         "WAN 2.2",
         "unknown",
@@ -57,11 +58,12 @@ class ModelExplorer {
       "ipadapter",
     ];
     this.VALID_BASES = [
-      "SD1.5",
-      "SDXL",
+      "SD 1.5",
+      "SDXL 1.0",
       "Flux",
       "Pony",
       "Illustrious",
+      "Qwen",
       "WAN 2.1",
       "WAN 2.2",
     ];
@@ -1064,7 +1066,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           // Allow through
         } else {
           // BUGFIX #7: Normalize baseModel comparison to handle variants
-          // e.g., "SDXL 1.0" should match "SDXL", "SD 1.5" should match "SD1.5"
+          // e.g., "SDXL 1.0" should match "SDXL 1.0", "SD 1.5" should match "SD 1.5"
           const normalizedBase = baseModel.replace(/\s+/g, "").toUpperCase();
 
           // BUGFIX #9: Check if this base is in our valid list
@@ -1085,7 +1087,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
                 .replace(/\s+/g, "")
                 .toUpperCase();
               // Check if the model's base starts with the selected base
-              // This handles "SDXL 1.0" matching "SDXL", "SD 1.5 LCM" matching "SD1.5"
+              // This handles "SDXL 1.0" matching "SDXL 1.0", "SD 1.5 LCM" matching "SD 1.5"
               return (
                 normalizedBase.startsWith(normalizedSelected) ||
                 normalizedBase === normalizedSelected
@@ -2240,7 +2242,7 @@ ${
                     <label class="form-label">Base Model</label>
                     <input type="text" class="form-input" name="baseModel" value="${this.escapeHtml(
                       model.baseModel || ""
-                    )}" placeholder="e.g., SD1.5, SDXL, Flux">
+                    )}" placeholder="e.g., SD 1.5, SDXL 1.0, Flux">
                 </div>
 
                 <div class="form-group">
