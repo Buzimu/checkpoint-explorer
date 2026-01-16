@@ -765,10 +765,17 @@ body {
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
-.lightbox-close {
+/* Top Left Button Container */
+.lightbox-top-buttons {
     position: absolute;
     top: 20px;
-    right: 20px;
+    left: 20px;
+    display: flex;
+    gap: 12px;
+    z-index: 2003;
+}
+
+.lightbox-close {
     background: rgba(255, 85, 85, 0.9);
     color: white;
     border: none;
@@ -781,11 +788,30 @@ body {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
-    z-index: 2001;
 }
 
 .lightbox-close:hover {
     background: #ff5555;
+    transform: scale(1.1);
+}
+
+.btn-download-lightbox {
+    background: rgba(139, 233, 253, 0.9);
+    color: #282a36;
+    border: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.btn-download-lightbox:hover {
+    background: #8be9fd;
     transform: scale(1.1);
 }
 
@@ -801,6 +827,7 @@ body {
     font-size: 14px;
     max-width: 80%;
     text-align: center;
+    z-index: 2003;
 }
 
 /* Version Carousel Styles */
@@ -1056,7 +1083,7 @@ body {
   padding: 16px 24px;
   border-radius: 12px;
   border: 2px solid #44475a;
-  z-index: 2002;
+  z-index: 2003;
 }
 
 .lightbox-rating-controls {
@@ -1125,6 +1152,395 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Lightbox Main Content Area */
+.lightbox-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  max-width: calc(100% - 400px); /* Leave room for metadata panel */
+  transition: max-width 0.3s ease;
+}
+
+.lightbox-main.metadata-hidden {
+  max-width: 100%;
+}
+
+/* Metadata Panel */
+.lightbox-metadata-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100%;
+  background: rgba(40, 42, 54, 0.98);
+  border-left: 2px solid #44475a;
+  display: flex;
+  flex-direction: column;
+  z-index: 2002;
+  transform: translateX(0);
+  transition: transform 0.3s ease;
+  overflow: hidden;
+}
+
+.lightbox-metadata-panel.hidden {
+  transform: translateX(100%);
+}
+
+.metadata-panel-header {
+  padding: 16px 20px;
+  background: rgba(68, 71, 90, 0.8);
+  border-bottom: 2px solid #6272a4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metadata-panel-header h3 {
+  margin: 0;
+  color: #f8f8f2;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.metadata-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-icon-small {
+  width: 32px;
+  height: 32px;
+  background: rgba(98, 114, 164, 0.3);
+  border: 1px solid #6272a4;
+  border-radius: 6px;
+  color: #f8f8f2;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-small:hover {
+  background: rgba(189, 147, 249, 0.5);
+  border-color: #bd93f9;
+  transform: scale(1.05);
+}
+
+.metadata-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.metadata-panel-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.metadata-panel-body::-webkit-scrollbar-track {
+  background: rgba(68, 71, 90, 0.3);
+}
+
+.metadata-panel-body::-webkit-scrollbar-thumb {
+  background: rgba(98, 114, 164, 0.5);
+  border-radius: 4px;
+}
+
+.metadata-panel-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(98, 114, 164, 0.7);
+}
+
+/* Metadata Status Indicator */
+.metadata-status {
+  padding: 12px 16px;
+  background: rgba(68, 71, 90, 0.5);
+  border-radius: 8px;
+  border-left: 4px solid #6272a4;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.metadata-status.full {
+  border-left-color: #50fa7b;
+  background: rgba(80, 250, 123, 0.1);
+}
+
+.metadata-status.partial {
+  border-left-color: #ffb86c;
+  background: rgba(255, 184, 108, 0.1);
+}
+
+.metadata-status.scrubbed {
+  border-left-color: #ff5555;
+  background: rgba(255, 85, 85, 0.1);
+}
+
+.status-icon {
+  font-size: 20px;
+}
+
+.status-text {
+  color: #f8f8f2;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.metadata-status.full .status-text {
+  color: #50fa7b;
+}
+
+.metadata-status.partial .status-text {
+  color: #ffb86c;
+}
+
+.metadata-status.scrubbed .status-text {
+  color: #ff5555;
+}
+
+/* Metadata Tabs */
+.metadata-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid #44475a;
+  padding-bottom: 8px;
+}
+
+.metadata-tab {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(68, 71, 90, 0.3);
+  border: 1px solid transparent;
+  border-radius: 6px 6px 0 0;
+  color: #8be9fd;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.metadata-tab:hover {
+  background: rgba(68, 71, 90, 0.5);
+  border-color: #6272a4;
+}
+
+.metadata-tab.active {
+  background: rgba(139, 233, 253, 0.15);
+  border-color: #8be9fd;
+  color: #f8f8f2;
+}
+
+.metadata-tab-content {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.metadata-tab-content.active {
+  display: block;
+}
+
+/* Metadata Sections */
+.metadata-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(68, 71, 90, 0.5);
+}
+
+.metadata-section:last-child {
+  border-bottom: none;
+}
+
+.metadata-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: #bd93f9;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metadata-value {
+  color: #f8f8f2;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.metadata-prompt {
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 10px;
+  background: rgba(68, 71, 90, 0.3);
+  border-radius: 6px;
+  border: 1px solid #6272a4;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.metadata-prompt::-webkit-scrollbar {
+  width: 6px;
+}
+
+.metadata-prompt::-webkit-scrollbar-thumb {
+  background: rgba(98, 114, 164, 0.5);
+  border-radius: 3px;
+}
+
+.metadata-subtext {
+  color: #6272a4;
+  font-size: 11px;
+  margin-top: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* Metadata Grid */
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.metadata-item {
+  padding: 10px;
+  background: rgba(68, 71, 90, 0.3);
+  border-radius: 6px;
+  border: 1px solid rgba(98, 114, 164, 0.3);
+}
+
+.metadata-label {
+  color: #8be9fd;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.metadata-item .metadata-value {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Copy Buttons */
+.btn-copy-small,
+.btn-copy-tiny {
+  background: rgba(139, 233, 253, 0.2);
+  border: 1px solid #8be9fd;
+  color: #8be9fd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.btn-copy-small {
+  padding: 4px 8px;
+}
+
+.btn-copy-tiny {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.btn-copy-small:hover,
+.btn-copy-tiny:hover {
+  background: #8be9fd;
+  color: #282a36;
+  transform: scale(1.05);
+}
+
+/* LoRA and ControlNet Lists */
+.lora-list,
+.controlnet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lora-item,
+.controlnet-item {
+  padding: 10px;
+  background: rgba(68, 71, 90, 0.4);
+  border-radius: 6px;
+  border-left: 3px solid #bd93f9;
+}
+
+.lora-name,
+.controlnet-name {
+  color: #f8f8f2;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.lora-weight,
+.controlnet-details {
+  color: #8be9fd;
+  font-size: 11px;
+}
+
+.seed-value {
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* ComfyUI Workflow Indicator */
+.comfyui-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 121, 198, 0.2);
+  border: 1px solid #ff79c6;
+  border-radius: 6px;
+  color: #ff79c6;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.comfyui-indicator:hover {
+  background: rgba(255, 121, 198, 0.3);
+  cursor: help;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .lightbox-metadata-panel {
+    width: 350px;
+  }
+  
+  .lightbox-main {
+    max-width: calc(100% - 350px);
+  }
+}
+
+@media (max-width: 900px) {
+  .lightbox-metadata-panel {
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .lightbox-main {
+    max-width: 100%;
+  }
+  
+  .lightbox-metadata-panel:not(.hidden) {
+    position: fixed;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+  }
 }
 
 /* Horizontal Filter Layout Updates */

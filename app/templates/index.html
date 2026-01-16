@@ -354,10 +354,134 @@
 
     <!-- Image Lightbox -->
     <div class="lightbox-overlay" id="imageLightbox" style="display: none">
-      <button class="lightbox-close">✕</button>
-      <div id="lightboxContent"></div>
-      <div class="lightbox-caption" id="lightboxCaption"></div>
-      <div class="lightbox-controls" id="lightboxControls"></div>
+      
+      <!-- Main Content Area -->
+      <div class="lightbox-main">
+        <!-- Top Left Buttons (inside main content) -->
+        <div class="lightbox-top-buttons">
+          <button class="lightbox-close" onclick="app.closeLightbox()">✕</button>
+          <button class="btn-download-lightbox" id="btnDownloadImageTop" title="Download image with metadata">
+            ⬇️
+          </button>
+        </div>
+        
+        <div id="lightboxContent"></div>
+        <div class="lightbox-caption" id="lightboxCaption"></div>
+        <div class="lightbox-controls" id="lightboxControls"></div>
+      </div>
+
+      <!-- Metadata Panel (Slides in from right) -->
+      <div class="lightbox-metadata-panel" id="metadataPanel">
+        <div class="metadata-panel-header">
+          <h3>📊 Image Metadata</h3>
+          <div class="metadata-header-actions">
+            <button class="btn-icon-small" id="btnDownloadImage" title="Download image with metadata">
+              ⬇️
+            </button>
+            <button class="btn-icon-small" id="btnToggleMetadata" title="Toggle metadata panel">
+              ◀
+            </button>
+          </div>
+        </div>
+
+        <div class="metadata-panel-body" id="metadataPanelBody">
+          <!-- Metadata Quality Indicator -->
+          <div class="metadata-status" id="metadataStatus">
+            <span class="status-icon">⏳</span>
+            <span class="status-text">Loading metadata...</span>
+          </div>
+
+          <!-- All Metadata in Single Scrollable View -->
+          <div class="metadata-section">
+            <div class="metadata-section-header">
+              <span>✨ Positive Prompt</span>
+              <button class="btn-copy-small" data-copy="positive-prompt">📋</button>
+            </div>
+            <div class="metadata-value metadata-prompt" id="positivePrompt">
+              Loading...
+            </div>
+          </div>
+
+          <div class="metadata-section">
+            <div class="metadata-section-header">
+              <span>🚫 Negative Prompt</span>
+              <button class="btn-copy-small" data-copy="negative-prompt">📋</button>
+            </div>
+            <div class="metadata-value metadata-prompt" id="negativePrompt">
+              Loading...
+            </div>
+          </div>
+
+          <div class="metadata-grid">
+            <div class="metadata-item">
+              <div class="metadata-label">Sampler</div>
+              <div class="metadata-value" id="metaSampler">-</div>
+            </div>
+            <div class="metadata-item">
+              <div class="metadata-label">Steps</div>
+              <div class="metadata-value" id="metaSteps">-</div>
+            </div>
+            <div class="metadata-item">
+              <div class="metadata-label">CFG Scale</div>
+              <div class="metadata-value" id="metaCfg">-</div>
+            </div>
+            <div class="metadata-item">
+              <div class="metadata-label">Seed</div>
+              <div class="metadata-value" id="metaSeed">
+                <span class="seed-value">-</span>
+                <button class="btn-copy-tiny" data-copy="seed">📋</button>
+              </div>
+            </div>
+            <div class="metadata-item">
+              <div class="metadata-label">Dimensions</div>
+              <div class="metadata-value" id="metaDimensions">-</div>
+            </div>
+            <div class="metadata-item">
+              <div class="metadata-label">Clip Skip</div>
+              <div class="metadata-value" id="metaClipSkip">-</div>
+            </div>
+          </div>
+
+          <div class="metadata-section">
+            <div class="metadata-section-header">
+              <span>🎨 Checkpoint</span>
+            </div>
+            <div class="metadata-value" id="metaCheckpoint">
+              Loading...
+            </div>
+            <div class="metadata-subtext" id="metaCheckpointHash">
+              Hash: -
+            </div>
+          </div>
+
+          <div class="metadata-section">
+            <div class="metadata-section-header">
+              <span>🎭 LoRAs Used</span>
+            </div>
+            <div id="metaLoraList" class="lora-list">
+              Loading...
+            </div>
+          </div>
+
+          <div class="metadata-section">
+            <div class="metadata-section-header">
+              <span>🖼️ VAE</span>
+            </div>
+            <div class="metadata-value" id="metaVae">
+              Loading...
+            </div>
+          </div>
+
+          <div class="metadata-section">
+            <div class="metadata-section-header">
+              <span>🎮 ControlNet</span>
+            </div>
+            <div id="metaControlNet" class="controlnet-list">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Gallery Modal -->

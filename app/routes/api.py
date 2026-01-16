@@ -936,6 +936,47 @@ def delete_media_file(filename):
         }), 500
 
 
+@bp.route('/media/<path:filename>/metadata', methods=['GET'])
+def get_media_metadata(filename):
+    """
+    Extract and return metadata from an image file
+    Supports ComfyUI workflows, A1111 parameters, and EXIF data
+    """
+    try:
+        from app.services.metadata_extractor import MetadataExtractor
+        
+        # Extract metadata
+        metadata = MetadataExtractor.extract_metadata(filename)
+        
+        if metadata is None:
+            return jsonify({
+                'success': False,
+                'error': 'File not found'
+            }), 404
+        
+        # Add summary info
+        status, message, icon = MetadataExtractor.get_metadata_summary(metadata)
+        
+        return jsonify({
+            'success': True,
+            'metadata': metadata,
+            'status': status,
+            'message': message,
+            'icon': icon,
+            'filename': filename
+        })
+        
+    except Exception as e:
+        print(f"❌ Failed to extract metadata from {filename}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'metadata': {
+                'quality': 'error'
+            }
+        }), 500
+
+
 # ============================================================================
 # SELF-HEALING ROUTES
 # ============================================================================
