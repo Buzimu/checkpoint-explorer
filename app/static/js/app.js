@@ -4188,4 +4188,3 @@ ${
 
 // Initialize app
 const app = new ModelExplorer();
-
