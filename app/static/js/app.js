@@ -2911,11 +2911,13 @@ ${
     const btnToggleMetadata = document.getElementById("btnToggleMetadata");
     const metadataPanel = document.getElementById("metadataPanel");
     const lightboxMain = document.querySelector(".lightbox-main");
-    
+
     btnToggleMetadata.onclick = () => {
       metadataPanel.classList.toggle("hidden");
       lightboxMain.classList.toggle("metadata-hidden");
-      btnToggleMetadata.textContent = metadataPanel.classList.contains("hidden") ? "▶" : "◀";
+      btnToggleMetadata.textContent = metadataPanel.classList.contains("hidden")
+        ? "▶"
+        : "◀";
     };
 
     // Setup download button (top left)
@@ -2923,7 +2925,7 @@ ${
     btnDownloadImageTop.onclick = () => {
       this.downloadImageWithMetadata(imagePath);
     };
-    
+
     // Setup download button (metadata panel header)
     const btnDownloadImage = document.getElementById("btnDownloadImage");
     btnDownloadImage.onclick = () => {
@@ -2931,13 +2933,15 @@ ${
     };
 
     // Setup copy buttons
-    document.querySelectorAll(".btn-copy-small, .btn-copy-tiny").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const copyType = btn.dataset.copy;
-        this.copyMetadata(copyType);
+    document
+      .querySelectorAll(".btn-copy-small, .btn-copy-tiny")
+      .forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const copyType = btn.dataset.copy;
+          this.copyMetadata(copyType);
+        });
       });
-    });
 
     lightbox.style.display = "flex";
   }
@@ -2949,30 +2953,32 @@ ${
 
   async loadMetadata(imagePath, model) {
     const metadataStatus = document.getElementById("metadataStatus");
-    
+
     // Show loading state
     metadataStatus.className = "metadata-status";
     metadataStatus.innerHTML = `
       <span class="status-icon">⏳</span>
       <span class="status-text">Loading metadata...</span>
     `;
-    
+
     try {
-      const response = await fetch(`/api/media/${encodeURIComponent(imagePath)}/metadata`);
+      const response = await fetch(
+        `/api/media/${encodeURIComponent(imagePath)}/metadata`
+      );
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || "Failed to load metadata");
       }
-      
+
       const metadata = result.metadata;
       const status = result.status;
       const message = result.message;
       const icon = result.icon;
-      
+
       // Update status indicator
       metadataStatus.className = `metadata-status ${status}`;
-      
+
       if (status === "full" && metadata.has_workflow) {
         metadataStatus.innerHTML = `
           <span class="status-icon">${icon}</span>
@@ -2987,20 +2993,19 @@ ${
           <span class="status-text">${message}</span>
         `;
       }
-      
+
       // Populate metadata fields
       this.populateMetadataFields(metadata, model);
-      
     } catch (error) {
       console.error("Failed to load metadata:", error);
-      
+
       // Show error state
       metadataStatus.className = "metadata-status scrubbed";
       metadataStatus.innerHTML = `
         <span class="status-icon">❌</span>
         <span class="status-text">Failed to load metadata: ${error.message}</span>
       `;
-      
+
       // Clear all fields
       this.clearMetadataFields();
     }
@@ -3008,68 +3013,86 @@ ${
 
   populateMetadataFields(metadata, model) {
     // Positive Prompt
-    const positivePrompt = metadata.positive_prompt || "No prompt data available";
+    const positivePrompt =
+      metadata.positive_prompt || "No prompt data available";
     document.getElementById("positivePrompt").textContent = positivePrompt;
-    
+
     // Negative Prompt
-    const negativePrompt = metadata.negative_prompt || "No negative prompt data";
+    const negativePrompt =
+      metadata.negative_prompt || "No negative prompt data";
     document.getElementById("negativePrompt").textContent = negativePrompt;
-    
+
     // Parameters
-    document.getElementById("metaSampler").textContent = metadata.sampler || "-";
+    document.getElementById("metaSampler").textContent =
+      metadata.sampler || "-";
     document.getElementById("metaSteps").textContent = metadata.steps || "-";
     document.getElementById("metaCfg").textContent = metadata.cfg_scale || "-";
-    
+
     // Seed with copy button
     const seed = metadata.seed || "-";
-    document.getElementById("metaSeed").innerHTML = 
-      seed !== "-" 
+    document.getElementById("metaSeed").innerHTML =
+      seed !== "-"
         ? `<span class="seed-value">${seed}</span><button class="btn-copy-tiny" data-copy="seed">📋</button>`
         : '<span class="seed-value">-</span>';
-    
+
     // Dimensions
-    const dimensions = metadata.dimensions || 
-                      (metadata.width && metadata.height ? `${metadata.width} × ${metadata.height}` : "-");
+    const dimensions =
+      metadata.dimensions ||
+      (metadata.width && metadata.height
+        ? `${metadata.width} × ${metadata.height}`
+        : "-");
     document.getElementById("metaDimensions").textContent = dimensions;
-    
-    document.getElementById("metaClipSkip").textContent = metadata.clip_skip || "-";
-    
+
+    document.getElementById("metaClipSkip").textContent =
+      metadata.clip_skip || "-";
+
     // Checkpoint (use from metadata if available, otherwise from model)
     const checkpointName = metadata.model || model?.name || "Unknown";
     document.getElementById("metaCheckpoint").textContent = checkpointName;
-    
-    const modelHash = metadata.model_hash || model?.hash?.substring(0, 10) || "unknown";
-    document.getElementById("metaCheckpointHash").textContent = `Hash: ${modelHash}...`;
-    
+
+    const modelHash =
+      metadata.model_hash || model?.hash?.substring(0, 10) || "unknown";
+    document.getElementById(
+      "metaCheckpointHash"
+    ).textContent = `Hash: ${modelHash}...`;
+
     // LoRAs
     const loraList = document.getElementById("metaLoraList");
     if (metadata.loras && metadata.loras.length > 0) {
-      loraList.innerHTML = metadata.loras.map(lora => `
+      loraList.innerHTML = metadata.loras
+        .map(
+          (lora) => `
         <div class="lora-item">
           <div class="lora-name">${this.escapeHtml(lora.name)}</div>
           <div class="lora-weight">Weight: ${lora.strength}</div>
         </div>
-      `).join('');
+      `
+        )
+        .join("");
     } else {
       loraList.textContent = "No LoRA information";
     }
-    
+
     // VAE
     document.getElementById("metaVae").textContent = metadata.vae || "Unknown";
-    
+
     // ControlNet
     const controlNetList = document.getElementById("metaControlNet");
     if (metadata.controlnets && metadata.controlnets.length > 0) {
-      controlNetList.innerHTML = metadata.controlnets.map(cn => `
+      controlNetList.innerHTML = metadata.controlnets
+        .map(
+          (cn) => `
         <div class="controlnet-item">
           <div class="controlnet-name">${this.escapeHtml(cn.name)}</div>
           <div class="controlnet-details">Weight: ${cn.strength}</div>
         </div>
-      `).join('');
+      `
+        )
+        .join("");
     } else {
       controlNetList.textContent = "Not used";
     }
-    
+
     // Re-attach copy button event listeners (since we updated the DOM)
     document.querySelectorAll(".btn-copy-tiny").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -3081,12 +3104,15 @@ ${
   }
 
   clearMetadataFields() {
-    document.getElementById("positivePrompt").textContent = "No prompt data available";
-    document.getElementById("negativePrompt").textContent = "No negative prompt data";
+    document.getElementById("positivePrompt").textContent =
+      "No prompt data available";
+    document.getElementById("negativePrompt").textContent =
+      "No negative prompt data";
     document.getElementById("metaSampler").textContent = "-";
     document.getElementById("metaSteps").textContent = "-";
     document.getElementById("metaCfg").textContent = "-";
-    document.getElementById("metaSeed").innerHTML = '<span class="seed-value">-</span>';
+    document.getElementById("metaSeed").innerHTML =
+      '<span class="seed-value">-</span>';
     document.getElementById("metaDimensions").textContent = "-";
     document.getElementById("metaClipSkip").textContent = "-";
     document.getElementById("metaCheckpoint").textContent = "Unknown";
@@ -3098,8 +3124,8 @@ ${
 
   copyMetadata(type) {
     let textToCopy = "";
-    
-    switch(type) {
+
+    switch (type) {
       case "positive-prompt":
         textToCopy = document.getElementById("positivePrompt").textContent;
         break;
@@ -3107,10 +3133,12 @@ ${
         textToCopy = document.getElementById("negativePrompt").textContent;
         break;
       case "seed":
-        textToCopy = document.querySelector("#metaSeed .seed-value").textContent;
+        textToCopy = document.querySelector(
+          "#metaSeed .seed-value"
+        ).textContent;
         break;
     }
-    
+
     if (textToCopy && textToCopy !== "-") {
       navigator.clipboard.writeText(textToCopy).then(() => {
         this.showToast("📋 Copied to clipboard!");
@@ -3123,7 +3151,7 @@ ${
       // Fetch the image as a blob to trigger download with original metadata intact
       const response = await fetch(`images/${imagePath}`);
       const blob = await response.blob();
-      
+
       // Create object URL and trigger download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -3132,10 +3160,10 @@ ${
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // Clean up object URL
       window.URL.revokeObjectURL(url);
-      
+
       this.showToast("⬇️ Downloaded image with metadata!");
     } catch (error) {
       console.error("Download failed:", error);
