@@ -1990,14 +1990,16 @@ ${
           const filename = relMedia.filename || "";
           const ext = filename.toLowerCase().split(".").pop();
           const isVideo = ext === "mp4" || ext === "webm";
-          
+
           if (isVideo && this.showVideos) {
             const mimeType = ext === "mp4" ? "video/mp4" : "video/webm";
             thumbnailHtml = `<video class="version-preview-thumb" autoplay loop muted playsinline preload="auto"><source src="images/${filename}" type="${mimeType}"></video>`;
           } else if (isVideo && !this.showVideos) {
             thumbnailHtml = `<div class="version-preview-thumb version-preview-placeholder">🎬</div>`;
           } else {
-            thumbnailHtml = `<img src="images/${filename}" class="version-preview-thumb" alt="${this.escapeHtml(relModel.name)}" onerror="this.style.display='none';" />`;
+            thumbnailHtml = `<img src="images/${filename}" class="version-preview-thumb" alt="${this.escapeHtml(
+              relModel.name
+            )}" onerror="this.style.display='none';" />`;
           }
         } else {
           thumbnailHtml = `<div class="version-preview-thumb version-preview-placeholder">🖼️</div>`;
