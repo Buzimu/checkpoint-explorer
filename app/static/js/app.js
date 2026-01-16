@@ -4189,4 +4189,3 @@ ${
 // Initialize app
 const app = new ModelExplorer();
 
-console.log("🎨 Model Explorer initialized in Flask server mode");

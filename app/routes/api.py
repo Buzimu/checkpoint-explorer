@@ -483,6 +483,8 @@ def get_activity_log():
         })
     except Exception as e:
         print(f"❌ Failed to get activity log: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -933,3 +935,163 @@ def delete_media_file(filename):
             'error': str(e)
         }), 500
 
+
+# ============================================================================
+# SELF-HEALING ROUTES
+# ============================================================================
+
+@bp.route('/healing/models-needing-healing', methods=['GET'])
+def get_models_needing_healing():
+    """
+    Get list of models that could benefit from self-healing
+    Returns models with missing URLs but with file hashes
+    """
+    try:
+        from app.services.self_healing import get_self_healing_service
+        
+        healer = get_self_healing_service()
+        models = healer.get_models_needing_healing()
+        
+        return jsonify({
+            'success': True,
+            'count': len(models),
+            'models': models
+        })
+        
+    except Exception as e:
+        print(f"❌ Failed to get models needing healing: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/healing/heal-model/<path:model_path>', methods=['POST'])
+def heal_single_model(model_path):
+    """
+    Attempt to heal a single model by finding its URL
+    """
+    try:
+        from app.services.self_healing import get_self_healing_service
+        from app.services.database import load_db, save_db
+        
+        db = load_db()
+        
+        if model_path not in db['models']:
+            return jsonify({
+                'success': False,
+                'error': 'Model not found'
+            }), 404
+        
+        healer = get_self_healing_service()
+        result = healer.heal_model(model_path, db['models'][model_path])
+        
+        # If successful, save the database
+        if result['success']:
+            healer._update_model_in_db(model_path, result, db)
+            save_db(db)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Failed to heal model: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/healing/heal-all', methods=['POST'])
+def heal_all_models():
+    """
+    Attempt to heal all models with missing URLs
+    Query params:
+    - limit: Max number to process (optional)
+    - skip_existing: Skip models with URLs (default: true)
+    """
+    try:
+        from app.services.self_healing import get_self_healing_service
+        
+        # Get query parameters
+        limit = request.args.get('limit', type=int)
+        skip_existing = request.args.get('skip_existing', 'true').lower() == 'true'
+        
+        healer = get_self_healing_service()
+        summary = healer.heal_all_models(limit=limit, skip_existing=skip_existing)
+        
+        return jsonify({
+            'success': True,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        print(f"❌ Failed to heal all models: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/healing/log', methods=['GET'])
+def get_healing_log():
+    """
+    Get recent healing attempts
+    """
+    try:
+        from app.services.self_healing import get_self_healing_service
+        
+        healer = get_self_healing_service()
+        log = healer.get_healing_log()
+        
+        return jsonify({
+            'success': True,
+            'count': len(log),
+            'log': log
+        })
+        
+    except Exception as e:
+        print(f"❌ Failed to get healing log: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/healing/test-archive', methods=['POST'])
+def test_archive_search():
+    """
+    Test searching the archive with a specific hash
+    For debugging/development purposes
+    """
+    try:
+        from app.services.civarchive import get_civarchive_service
+        
+        data = request.json
+        file_hash = data.get('hash')
+        
+        if not file_hash:
+            return jsonify({
+                'success': False,
+                'error': 'Hash parameter required'
+            }), 400
+        
+        archive = get_civarchive_service()
+        result = archive.search_by_hash(file_hash)
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+        
+    except Exception as e:
+        print(f"❌ Archive search test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

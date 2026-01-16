@@ -71,18 +71,30 @@ class CivitAIService:
         now = datetime.now()
         scraper = get_background_scraper()
         
-        # Calculate next scrape time (based on rate limit)
+        # Calculate next scrape time
+        # Get the specific model that will be scraped
+        next_scrape_model = scraper.get_next_scrape_model()
         if self.last_scrape_time:
             next_scrape = self.last_scrape_time + timedelta(seconds=self.rate_limit_delay)
-            if next_scrape > now:
-                seconds_until = (next_scrape - now).total_seconds()
-                upcoming.append({
-                    'task': 'CivitAI Scrape',
-                    'description': 'Next model scrape',
-                    'scheduledTime': next_scrape.isoformat(),
-                    'secondsUntil': int(seconds_until),
-                    'type': 'scheduled'
-                })
+            seconds_until = max(0, int((next_scrape - now).total_seconds()))
+            description = f'Scraping: {next_scrape_model}' if next_scrape_model else 'Ready to scrape'
+            upcoming.append({
+                'task': 'CivitAI Scrape',
+                'description': description,
+                'scheduledTime': next_scrape.isoformat() if seconds_until > 0 else now.isoformat(),
+                'secondsUntil': seconds_until,
+                'type': 'scheduled'
+            })
+        else:
+            # Never scraped, show as ready
+            description = f'Scraping: {next_scrape_model}' if next_scrape_model else 'Ready to scrape'
+            upcoming.append({
+                'task': 'CivitAI Scrape',
+                'description': description,
+                'scheduledTime': now.isoformat(),
+                'secondsUntil': 0,
+                'type': 'scheduled'
+            })
         
         # Calculate next media audit
         if hasattr(scraper, 'last_media_audit') and scraper.last_media_audit:
@@ -97,8 +109,37 @@ class CivitAIService:
                     'type': 'scheduled'
                 })
         
-        # Sort by scheduled time
-        upcoming.sort(key=lambda x: x['secondsUntil'])
+        # Calculate next healing attempt
+        next_healing_model = scraper.get_next_healing_model()
+        if hasattr(scraper, 'last_healing_attempt'):
+            if scraper.last_healing_attempt:
+                next_healing = scraper.last_healing_attempt + timedelta(seconds=scraper.healing_rate_limit)
+                seconds_until = max(0, int((next_healing - now).total_seconds()))
+                description = f'Healing: {next_healing_model}' if next_healing_model else 'Ready to heal'
+                upcoming.append({
+                    'task': 'Self-Healing',
+                    'description': description,
+                    'scheduledTime': next_healing.isoformat() if seconds_until > 0 else now.isoformat(),
+                    'secondsUntil': seconds_until,
+                    'type': 'scheduled'
+                })
+            else:
+                # Never attempted healing, show as ready
+                description = f'Healing: {next_healing_model}' if next_healing_model else 'Ready to heal'
+                upcoming.append({
+                    'task': 'Self-Healing',
+                    'description': description,
+                    'scheduledTime': now.isoformat(),
+                    'secondsUntil': 0,
+                    'type': 'scheduled'
+                })
+        
+        # Sort by scheduled time (safely handle any data type issues)
+        try:
+            upcoming.sort(key=lambda x: x.get('secondsUntil', 0))
+        except Exception as e:
+            print(f"⚠️ Error sorting upcoming tasks: {e}")
+            # Return unsorted if sort fails
         
         return upcoming
     

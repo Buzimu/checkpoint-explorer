@@ -21,6 +21,8 @@ class BackgroundScraper:
         self.last_reset = datetime.now().date()
         self.media_audit_interval = 300  # Run media audit every 5 minutes (300 seconds)
         self.last_media_audit = None  # Track when we last ran media audit
+        self.last_healing_attempt = None  # Track last healing attempt time
+        self.healing_rate_limit = 10  # Seconds between healing attempts
     
     def start(self):
         """Start the background scraping thread"""
@@ -95,6 +97,139 @@ class BackgroundScraper:
             except:
                 pass
     
+    def _can_attempt_healing(self):
+        """Check if enough time has passed since last healing attempt"""
+        if self.last_healing_attempt is None:
+            return True
+        
+        now = datetime.now()
+        elapsed = (now - self.last_healing_attempt).total_seconds()
+        return elapsed >= self.healing_rate_limit
+    
+    def _find_model_needing_healing(self):
+        """
+        Find a model that needs URL healing
+        
+        Eligible models:
+        - Have a valid SHA256 hash
+        - Missing CivitAI URL (empty or None)
+        - Haven't failed healing in the last 24 hours
+        """
+        db = load_db()
+        
+        eligible = []
+        now = datetime.now()
+        
+        total_models = len(db['models'])
+        no_hash_count = 0
+        has_url_count = 0
+        recently_attempted_count = 0
+        
+        for model_path, model in db['models'].items():
+            # Must have a hash
+            file_hash = model.get('fileHash')
+            if not file_hash:
+                no_hash_count += 1
+                continue
+            
+            # Must be missing URL
+            civitai_url = model.get('civitaiUrl', '').strip()
+            civitai_model_id = model.get('civitaiModelId', '').strip()
+            if civitai_url or civitai_model_id:
+                has_url_count += 1
+                continue  # Already has URL or model ID
+            
+            # Check if healing failed recently (within last 24 hours)
+            civitai_data = model.get('civitaiData', {})
+            healing_attempted = civitai_data.get('healingAttempted')
+            if healing_attempted:
+                try:
+                    last_attempt = datetime.fromisoformat(healing_attempted)
+                    hours_since = (now - last_attempt).total_seconds() / 3600
+                    
+                    # Skip if attempted less than 24 hours ago
+                    if hours_since < 24:
+                        recently_attempted_count += 1
+                        continue
+                except (ValueError, TypeError):
+                    pass  # Invalid date, treat as never attempted
+            
+            # Add to eligible list with priority (never attempted first)
+            priority = 0 if not healing_attempted else 1
+            eligible.append((priority, model_path, model))
+        
+        # Debug output
+        if not eligible:
+            print(f"🔍 Healing scan: {total_models} total, {no_hash_count} no hash, {has_url_count} have URL, {recently_attempted_count} recently attempted, 0 eligible")
+            return None
+        
+        print(f"🔍 Healing scan: {total_models} total, {len(eligible)} eligible for healing")
+        
+        # Sort by priority (never attempted first)
+        eligible.sort(key=lambda x: x[0])
+        
+        # Return the highest priority model
+        return eligible[0][1]  # Return just the path
+    
+    def _heal_model(self, model_path):
+        """Attempt to heal a single model's missing URL"""
+        try:
+            from app.services.self_healing import SelfHealingService
+            from app.services.civitai import get_civitai_service
+            from app.services.database import save_db
+            
+            db = load_db()
+            model = db['models'].get(model_path)
+            if not model:
+                return
+            
+            model_name = model.get('name', model_path.split('/')[-1])
+            print(f"\n🩹 Attempting to heal: {model_name}")
+            
+            healing_service = SelfHealingService()
+            result = healing_service.heal_model(model_path, model)
+            
+            # Update healing attempt timestamp regardless of success
+            if 'civitaiData' not in model:
+                model['civitaiData'] = {}
+            model['civitaiData']['healingAttempted'] = datetime.now().isoformat()
+            
+            if result.get('success'):
+                print(f"✅ Healed: {model_name} → {result.get('url', 'URL recovered')}")
+                
+                # Log success
+                service = get_civitai_service()
+                service.log_activity('Self-Healing', model_name, 'success', result.get('message', 'URL recovered'))
+            else:
+                print(f"⚠️ Could not heal: {model_name} - {result.get('message', 'Not found in archive')}")
+            
+            # Save DB with updated healing timestamp
+            save_db(db)
+            
+        except Exception as e:
+            print(f"❌ Healing failed for {model_path}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def get_next_scrape_model(self):
+        """Get the name of the next model that will be scraped"""
+        model_info = self._find_eligible_model()
+        if model_info:
+            # _find_eligible_model returns a dict with 'path' and 'name'
+            return model_info.get('name', 'Unknown')
+        return None
+    
+    def get_next_healing_model(self):
+        """Get the name of the next model that will be healed"""
+        model_path = self._find_model_needing_healing()
+        if model_path:
+            # _find_model_needing_healing returns a string path
+            db = load_db()
+            model = db['models'].get(model_path)
+            if model:
+                return model.get('name', model_path.split('/')[-1])
+        return None
+    
     def _scrape_loop(self):
         """Main scraping loop - runs in background thread"""
         print("🔄 Background scraping loop started")
@@ -127,10 +262,27 @@ class BackgroundScraper:
                 if model_to_scrape:
                     self._scrape_model(model_to_scrape)
                     self.scrapes_today += 1
+                    
+                    # After scraping, check if we can also heal a model
+                    if self._can_attempt_healing():
+                        model_to_heal = self._find_model_needing_healing()
+                        if model_to_heal:
+                            self._heal_model(model_to_heal)
+                            self.last_healing_attempt = datetime.now()
                 else:
-                    # No eligible models, wait longer
-                    print("💤 No eligible models to scrape (all up-to-date or invalid URLs)")
-                    time.sleep(self.scrape_interval)
+                    # No models to scrape, try healing instead
+                    if self._can_attempt_healing():
+                        model_to_heal = self._find_model_needing_healing()
+                        if model_to_heal:
+                            self._heal_model(model_to_heal)
+                            self.last_healing_attempt = datetime.now()
+                        else:
+                            # Nothing to do
+                            print("💤 No eligible models to scrape or heal")
+                            time.sleep(self.scrape_interval)
+                    else:
+                        # Wait for healing rate limit
+                        time.sleep(self.scrape_interval)
                 
             except Exception as e:
                 print(f"❌ Background scraper error: {e}")
