@@ -38,6 +38,36 @@ class CivArchiveService:
             print(f"⏳ Archive rate limit: waiting {wait_time:.1f} seconds...")
             time.sleep(wait_time)
     
+    def convert_huggingface_url_to_details(self, url):
+        """
+        Convert HuggingFace /resolve/ URL to /blob/ URL for details page
+        
+        HuggingFace uses /resolve/ for direct download links but /blob/ for
+        the details page where you can see metadata, history, etc.
+        
+        Args:
+            url: Original URL (may contain /resolve/)
+        
+        Returns:
+            str: URL with /resolve/ replaced by /blob/ if applicable
+        
+        Examples:
+            Input:  https://huggingface.co/user/repo/resolve/main/file.pth
+            Output: https://huggingface.co/user/repo/blob/main/file.pth
+        """
+        if not url or 'huggingface.co' not in url:
+            return url
+        
+        # Replace /resolve/ with /blob/ for details page
+        if '/resolve/' in url:
+            details_url = url.replace('/resolve/', '/blob/')
+            print(f"   🔄 Converted HuggingFace URL:")
+            print(f"      Download: {url}")
+            print(f"      Details:  {details_url}")
+            return details_url
+        
+        return url
+    
     def search_by_hash(self, file_hash):
         """
         Search the archive for a model by its SHA256 hash
@@ -228,6 +258,10 @@ class CivArchiveService:
                 mirror_name = mirror.get('name', model_name)
                 
                 if mirror_url and mirror_platform != 'civitai':  # Don't duplicate civitai
+                    # Convert HuggingFace /resolve/ URLs to /blob/ URLs for details
+                    if mirror_platform.lower() == 'huggingface':
+                        mirror_url = self.convert_huggingface_url_to_details(mirror_url)
+                    
                     results.append({
                         'source': mirror_platform,
                         'status': 'live',

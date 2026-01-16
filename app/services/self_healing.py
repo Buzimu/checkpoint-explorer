@@ -222,20 +222,28 @@ class SelfHealingService:
         Returns:
             dict: Healing result
         """
+        url = archive_result['url']
+        source = archive_result['source']
+        
+        # For HuggingFace, convert /resolve/ to /blob/ for details page
+        if source.lower() == 'huggingface':
+            url = self.civarchive.convert_huggingface_url_to_details(url)
+        
         result = {
             'success': True,
             'action': 'url_recovered_other',
-            'newUrl': archive_result['url'],
-            'source': archive_result['source'],
-            'message': f"Found {archive_result['source']} URL in archive",
+            'newUrl': url,
+            'source': source,
+            'message': f"Found {source} URL in archive",
             'metadata': {
-                'sourcePlatform': archive_result['source'],
-                'archiveUrl': archive_result.get('archiveUrl')
+                'sourcePlatform': source,
+                'archiveUrl': archive_result.get('archiveUrl'),
+                'originalUrl': archive_result['url']  # Keep original for reference
             }
         }
         
-        print(f"\n🔗 Found non-CivitAI source: {archive_result['source']}")
-        print(f"   URL: {archive_result['url']}")
+        print(f"\n🔗 Found non-CivitAI source: {source}")
+        print(f"   URL: {url}")
         
         return result
     
