@@ -2088,6 +2088,32 @@ body {
   transform: translateX(4px);
 }
 
+/* Preview thumbnail in related versions */
+.version-preview-thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid rgba(68, 71, 90, 0.6);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.version-preview-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(40, 42, 54, 0.8);
+  color: #6272a4;
+  font-size: 24px;
+}
+
+.version-link-item:hover .version-preview-thumb {
+  border-color: #bd93f9;
+  box-shadow: 0 4px 12px rgba(189, 147, 249, 0.3);
+  transform: scale(1.05);
+}
+
 .related-version-item {
   padding: 10px 12px;
   background: rgba(68, 71, 90, 0.3);

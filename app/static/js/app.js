@@ -1983,6 +1983,26 @@ ${
         const isConfirmed = linkType === "confirmed";
         const isAssumed = linkType === "assumed";
 
+        // Get preview image/video for this related version
+        const relMedia = this.getAppropriateMedia(relModel);
+        let thumbnailHtml;
+        if (relMedia) {
+          const filename = relMedia.filename || "";
+          const ext = filename.toLowerCase().split(".").pop();
+          const isVideo = ext === "mp4" || ext === "webm";
+          
+          if (isVideo && this.showVideos) {
+            const mimeType = ext === "mp4" ? "video/mp4" : "video/webm";
+            thumbnailHtml = `<video class="version-preview-thumb" autoplay loop muted playsinline preload="auto"><source src="images/${filename}" type="${mimeType}"></video>`;
+          } else if (isVideo && !this.showVideos) {
+            thumbnailHtml = `<div class="version-preview-thumb version-preview-placeholder">🎬</div>`;
+          } else {
+            thumbnailHtml = `<img src="images/${filename}" class="version-preview-thumb" alt="${this.escapeHtml(relModel.name)}" onerror="this.style.display='none';" />`;
+          }
+        } else {
+          thumbnailHtml = `<div class="version-preview-thumb version-preview-placeholder">🖼️</div>`;
+        }
+
         return `
         <div class="version-link-item ${linkType}" 
           data-rel-path="${this.escapeAttribute(relPath)}"
@@ -1996,47 +2016,53 @@ ${
           margin-bottom: 8px;
           cursor: pointer;
           transition: all 0.2s ease;
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
         ">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <span style="font-size: 16px;">${
-              isConfirmed ? "✅" : isAssumed ? "🔍" : "🔗"
-            }</span>
-            <span style="font-weight: 600; color: #f8f8f2; font-size: 13px;">
-              ${this.escapeHtml(relModel.name)}
-            </span>
-          </div>
-          <div style="font-size: 11px; color: #8be9fd; margin-left: 24px;">
-            ${relModel.baseModel || "Unknown"}
-          </div>
-          <div style="font-size: 11px; color: #6272a4; margin-left: 24px; margin-top: 4px;">
+          ${thumbnailHtml}
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <span style="font-size: 16px;">${
+                isConfirmed ? "✅" : isAssumed ? "🔍" : "🔗"
+              }</span>
+              <span style="font-weight: 600; color: #f8f8f2; font-size: 13px;">
+                ${this.escapeHtml(relModel.name)}
+              </span>
+            </div>
+            <div style="font-size: 11px; color: #8be9fd;">
+              ${relModel.baseModel || "Unknown"}
+            </div>
+            <div style="font-size: 11px; color: #6272a4; margin-top: 4px;">
+              ${
+                isConfirmed
+                  ? "✅ Confirmed link (both have CivitAI data)"
+                  : isAssumed
+                  ? `🔍 Assumed link (matched by file size: ${linkMeta.sizeDiff?.toFixed(
+                      2
+                    )}% diff)`
+                  : "🔗 Linked"
+              }
+            </div>
             ${
-              isConfirmed
-                ? "✅ Confirmed link (both have CivitAI data)"
-                : isAssumed
-                ? `🔍 Assumed link (matched by file size: ${linkMeta.sizeDiff?.toFixed(
-                    2
-                  )}% diff)`
-                : "🔗 Linked"
+              isAssumed
+                ? `
+              <div style="font-size: 11px; color: #ffb86c; margin-top: 4px;">
+                💡 Add CivitAI link to confirm this relationship
+              </div>
+            `
+                : ""
+            }
+            ${
+              linkMeta.versionName
+                ? `
+              <div style="font-size: 11px; color: #bd93f9; margin-top: 4px;">
+                CivitAI Version: ${this.escapeHtml(linkMeta.versionName)}
+              </div>
+            `
+                : ""
             }
           </div>
-          ${
-            isAssumed
-              ? `
-            <div style="font-size: 11px; color: #ffb86c; margin-left: 24px; margin-top: 4px;">
-              💡 Add CivitAI link to confirm this relationship
-            </div>
-          `
-              : ""
-          }
-          ${
-            linkMeta.versionName
-              ? `
-            <div style="font-size: 11px; color: #bd93f9; margin-left: 24px; margin-top: 4px;">
-              CivitAI Version: ${this.escapeHtml(linkMeta.versionName)}
-            </div>
-          `
-              : ""
-          }
         </div>
       `;
       })
