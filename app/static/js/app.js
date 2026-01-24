@@ -282,7 +282,7 @@ class ModelExplorer {
       } else {
         const error = await response.json();
         this.showToast(
-          `❌ Gallery load failed: ${error.error || "Unknown error"}`
+          `❌ Gallery load failed: ${error.error || "Unknown error"}`,
         );
       }
     } catch (error) {
@@ -347,19 +347,19 @@ class ModelExplorer {
         if (item.isVideo) {
           return `
           <div class="gallery-item ${orphanedClass}" onclick="app.openGalleryMedia('${this.escapeAttribute(
-            item.filename
+            item.filename,
           )}', ${item.orphaned}, '${this.escapeAttribute(
-            item.modelPath || ""
+            item.modelPath || "",
           )}')">
             <video class="gallery-thumbnail" muted loop onmouseover="this.play()" onmouseout="this.pause()">
               <source src="images/${item.filename}" type="video/${item.filename
-            .split(".")
-            .pop()}">
+                .split(".")
+                .pop()}">
             </video>
             ${orphanedLabel}
             <div class="gallery-item-info">
               <div class="gallery-item-name">${this.escapeHtml(
-                item.modelName
+                item.modelName,
               )}</div>
             </div>
           </div>
@@ -367,9 +367,9 @@ class ModelExplorer {
         } else {
           return `
           <div class="gallery-item ${orphanedClass}" onclick="app.openGalleryMedia('${this.escapeAttribute(
-            item.filename
+            item.filename,
           )}', ${item.orphaned}, '${this.escapeAttribute(
-            item.modelPath || ""
+            item.modelPath || "",
           )}')">
             <img class="gallery-thumbnail" src="images/${
               item.filename
@@ -377,7 +377,7 @@ class ModelExplorer {
             ${orphanedLabel}
             <div class="gallery-item-info">
               <div class="gallery-item-name">${this.escapeHtml(
-                item.modelName
+                item.modelName,
               )}</div>
             </div>
           </div>
@@ -425,7 +425,7 @@ class ModelExplorer {
     lightboxControls.innerHTML = `
       <div class="lightbox-rating-controls">
         <button class="btn-lightbox-delete" onclick="app.deleteOrphanedMedia('${this.escapeAttribute(
-          filename
+          filename,
         )}')">🗑️ Delete Orphaned File</button>
       </div>
     `;
@@ -436,7 +436,7 @@ class ModelExplorer {
   async deleteOrphanedMedia(filename) {
     if (
       !confirm(
-        `Are you sure you want to delete this orphaned file?\n\n${filename}\n\nThis action cannot be undone.`
+        `Are you sure you want to delete this orphaned file?\n\n${filename}\n\nThis action cannot be undone.`,
       )
     ) {
       return;
@@ -447,7 +447,7 @@ class ModelExplorer {
         `/api/media/${encodeURIComponent(filename)}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (response.ok) {
@@ -542,7 +542,7 @@ class ModelExplorer {
       } else {
         const error = await response.json();
         this.showToast(
-          `❌ Version detection failed: ${error.error || "Unknown error"}`
+          `❌ Version detection failed: ${error.error || "Unknown error"}`,
         );
       }
     } catch (error) {
@@ -644,7 +644,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       setTimeout(() => {
         // Find the card by primary path (stored in data-primary-path)
         const modelCard = document.querySelector(
-          `.model-card[data-primary-path="${CSS.escape(modelPath)}"]`
+          `.model-card[data-primary-path="${CSS.escape(modelPath)}"]`,
         );
         if (modelCard) {
           const carousel = modelCard.querySelector(".version-carousel-scroll");
@@ -749,18 +749,18 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           activity.status === "success"
             ? "success"
             : activity.status === "error"
-            ? "error"
-            : index === 0
-            ? "active"
-            : "pending";
+              ? "error"
+              : index === 0
+                ? "active"
+                : "pending";
         const statusBadge =
           index === 0
             ? "running"
             : activity.status === "success"
-            ? "completed"
-            : activity.status === "error"
-            ? "failed"
-            : "pending";
+              ? "completed"
+              : activity.status === "error"
+                ? "failed"
+                : "pending";
 
         queueHTML += `
           <div class="ticker-queue-item ${itemStatusClass}">
@@ -816,7 +816,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     // Set all type checkboxes to checked
     this.DEFAULT_FILTERS.types.forEach((type) => {
       const checkbox = document.querySelector(
-        `#typeCheckboxes input[value="${type}"]`
+        `#typeCheckboxes input[value="${type}"]`,
       );
       if (checkbox) checkbox.checked = true;
     });
@@ -824,7 +824,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     // Set all base model checkboxes to checked
     this.DEFAULT_FILTERS.baseModels.forEach((base) => {
       const checkbox = document.querySelector(
-        `#baseCheckboxes input[value="${base}"]`
+        `#baseCheckboxes input[value="${base}"]`,
       );
       if (checkbox) checkbox.checked = true;
     });
@@ -921,7 +921,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       console.log(
         "✅ Loaded from server:",
         Object.keys(data.models).length,
-        "models"
+        "models",
       );
       this.showToast("✅ Database loaded from server!");
     } catch (error) {
@@ -981,7 +981,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
     if (Object.keys(toMerge).length > 0) {
       console.log(
-        `✅ Merged ${Object.keys(toMerge).length} HIGH/LOW variant pairs`
+        `✅ Merged ${Object.keys(toMerge).length} HIGH/LOW variant pairs`,
       );
     }
   }
@@ -1034,12 +1034,12 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
         }
 
         return modelWithFlags;
-      }
+      },
     );
 
     // Sort by name
     this.filteredModels.sort((a, b) =>
-      (a.name || "").localeCompare(b.name || "")
+      (a.name || "").localeCompare(b.name || ""),
     );
 
     console.log("✅ Models processed");
@@ -1059,12 +1059,12 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
     // Get selected types
     const selectedTypes = Array.from(
-      document.querySelectorAll("#typeCheckboxes input:checked")
+      document.querySelectorAll("#typeCheckboxes input:checked"),
     ).map((cb) => cb.value);
 
     // Get selected base models
     const selectedBases = Array.from(
-      document.querySelectorAll("#baseCheckboxes input:checked")
+      document.querySelectorAll("#baseCheckboxes input:checked"),
     ).map((cb) => cb.value);
 
     const favoritesOnly = document.getElementById("favoritesFilter").checked;
@@ -1129,7 +1129,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           const tagsMatch =
             Array.isArray(model.tags) &&
             model.tags.some((tag) =>
-              (tag || "").toLowerCase().includes(searchTerm)
+              (tag || "").toLowerCase().includes(searchTerm),
             );
 
           if (!nameMatch && !tagsMatch) {
@@ -1281,7 +1281,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
       // They're counted in filteredModels but shown as stacks, not separate cards
       if (!this.isPrimaryVersion(model)) {
         console.log(
-          `⏭️ Skipping secondary version: ${model.name} (part of version stack)`
+          `⏭️ Skipping secondary version: ${model.name} (part of version stack)`,
         );
         return;
       }
@@ -1440,8 +1440,8 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
             linkType === "confirmed"
               ? "✅"
               : linkType === "assumed"
-              ? "🔍"
-              : "";
+                ? "🔍"
+                : "";
 
           return `
           <button
@@ -1524,10 +1524,10 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     <div class="model-info">
       <div class="model-header">
         <div class="model-name">${this.escapeHtml(
-          activeVersion.name || "Unnamed Model"
+          activeVersion.name || "Unnamed Model",
         )}</div>
         <div class="favorite-icon" onclick="event.stopPropagation(); app.toggleFavorite('${this.escapeAttribute(
-          activeVersion.path
+          activeVersion.path,
         )}')">
           ${activeVersion.favorite ? "⭐" : "☆"}
         </div>
@@ -1562,13 +1562,13 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
 
       const updateArrowStates = () => {
         const activeIdx = versionTabs.findIndex((tab) =>
-          tab.classList.contains("active")
+          tab.classList.contains("active"),
         );
         if (prevBtn && nextBtn) {
           prevBtn.classList.toggle("disabled", activeIdx <= 0);
           nextBtn.classList.toggle(
             "disabled",
-            activeIdx >= versionTabs.length - 1
+            activeIdx >= versionTabs.length - 1,
           );
         }
       };
@@ -1578,7 +1578,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           e.stopPropagation();
           e.preventDefault();
           const activeIdx = versionTabs.findIndex((tab) =>
-            tab.classList.contains("active")
+            tab.classList.contains("active"),
           );
           if (activeIdx > 0) {
             versionTabs[activeIdx - 1].click();
@@ -1591,7 +1591,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
           e.stopPropagation();
           e.preventDefault();
           const activeIdx = versionTabs.findIndex((tab) =>
-            tab.classList.contains("active")
+            tab.classList.contains("active"),
           );
           if (activeIdx < versionTabs.length - 1) {
             versionTabs[activeIdx + 1].click();
@@ -1667,7 +1667,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     const deleteButton =
       model._status === "missing"
         ? `<button class="btn btn-danger" onclick="app.deleteMissingModel('${this.escapeAttribute(
-            model.path
+            model.path,
           )}')">🗑️ Delete</button>`
         : "";
 
@@ -1728,19 +1728,19 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
     <div style="margin: 16px 0; padding: 12px; background: rgba(68, 71, 90, 0.3); border-radius: 8px;">
       <div style="font-size: 13px; font-weight: 600; color: #bd93f9; margin-bottom: 8px;">
         📦 ${this.escapeHtml(
-          model.newVersionAvailable.newestVersion.versionName
+          model.newVersionAvailable.newestVersion.versionName,
         )}
       </div>
       <div style="font-size: 12px; color: #6272a4; margin-bottom: 4px;">
         📅 Published: ${new Date(
-          model.newVersionAvailable.newestVersion.publishedAt
+          model.newVersionAvailable.newestVersion.publishedAt,
         ).toLocaleDateString()}
       </div>
       ${
         model.newVersionAvailable.newestVersion.baseModel
           ? `<div style="font-size: 12px; color: #6272a4;">
              🎯 Base: ${this.escapeHtml(
-               model.newVersionAvailable.newestVersion.baseModel
+               model.newVersionAvailable.newestVersion.baseModel,
              )}
            </div>`
           : ""
@@ -1792,7 +1792,7 @@ document.getElementById('linkVersionsBtn').addEventListener('click', () => {
                 ${mismatchWarning}
                 <div class="details-header">
                     <div class="details-title">${this.escapeHtml(
-                      model.name || "Unnamed Model"
+                      model.name || "Unnamed Model",
                     )}</div>
                     <div class="details-actions">
                         <button class="btn btn-primary" onclick="app.openEditModal()">✏️ Edit</button>
@@ -1930,14 +1930,14 @@ ${
             version.versionId
           }', '_blank')">⬇️ Download</button>
           <button class="btn-mini" onclick="app.skipVersion('${this.escapeAttribute(
-            model.path
+            model.path,
           )}', '${version.versionId}')">⏭️ Skip</button>
         `;
         } else if (version.status === "skipped") {
           badge = '<span class="version-badge skipped">⏭️ Skipped</span>';
           actions = `
           <button class="btn-mini" onclick="app.unskipVersion('${this.escapeAttribute(
-            model.path
+            model.path,
           )}', '${version.versionId}')">↩️ Unskip</button>
         `;
         }
@@ -1946,7 +1946,7 @@ ${
         <div class="version-item">
           <div class="version-info">
             <span class="version-name">${this.escapeHtml(
-              version.name || "Unknown"
+              version.name || "Unknown",
             )}</span>
             <span class="version-base">${version.baseModel || "Unknown"}</span>
             ${badge}
@@ -1998,7 +1998,7 @@ ${
             thumbnailHtml = `<div class="version-preview-thumb version-preview-placeholder">🎬</div>`;
           } else {
             thumbnailHtml = `<img src="images/${filename}" class="version-preview-thumb" alt="${this.escapeHtml(
-              relModel.name
+              relModel.name,
             )}" onerror="this.style.display='none';" />`;
           }
         } else {
@@ -2040,10 +2040,10 @@ ${
                 isConfirmed
                   ? "✅ Confirmed link (both have CivitAI data)"
                   : isAssumed
-                  ? `🔍 Assumed link (matched by file size: ${linkMeta.sizeDiff?.toFixed(
-                      2
-                    )}% diff)`
-                  : "🔗 Linked"
+                    ? `🔍 Assumed link (matched by file size: ${linkMeta.sizeDiff?.toFixed(
+                        2,
+                      )}% diff)`
+                    : "🔗 Linked"
               }
             </div>
             ${
@@ -2086,7 +2086,7 @@ ${
                         ${model.tags
                           .map(
                             (tag) =>
-                              `<span class="tag">${this.escapeHtml(tag)}</span>`
+                              `<span class="tag">${this.escapeHtml(tag)}</span>`,
                           )
                           .join("")}
                     </div>
@@ -2111,8 +2111,8 @@ ${
                           .map(
                             (word) =>
                               `<span class="trigger-word">${this.escapeHtml(
-                                word
-                              )}</span>`
+                                word,
+                              )}</span>`,
                           )
                           .join("")}
                     </div>
@@ -2133,7 +2133,7 @@ ${
                         <div class="section-title">📝 Notes</div>
                     </div>
                     <div class="notes-content">${this.escapeHtml(
-                      model.notes
+                      model.notes,
                     )}</div>
                 </div>
                 `
@@ -2154,14 +2154,14 @@ ${
                         (prompt, idx) => `
                         <div class="example-prompt">
                             <div class="prompt-title">${this.escapeHtml(
-                              prompt.title
+                              prompt.title,
                             )}</div>
                             <div class="prompt-text">${this.escapeHtml(
-                              prompt.prompt
+                              prompt.prompt,
                             )}</div>
                             <button class="btn-copy prompt-copy" onclick="app.copyPrompt(${idx})">📋</button>
                         </div>
-                    `
+                    `,
                       )
                       .join("")}
                 </div>
@@ -2192,14 +2192,14 @@ ${
                             <div class="gallery-image" onclick="app.openLightbox('${
                               img.filename
                             }', '${this.escapeAttribute(
-                              img.caption || model.name
+                              img.caption || model.name,
                             )}', '${this.escapeAttribute(model.path)}')">
                               ${this.renderMediaElement(
                                 img,
-                                img.caption || model.name
+                                img.caption || model.name,
                               )}
                             </div>
-                        `
+                        `,
                           )
                           .join("")}
                     </div>
@@ -2213,7 +2213,7 @@ ${
     // Add event listeners for related version items
     setTimeout(() => {
       const versionLinkItems = sidebar.querySelectorAll(
-        ".version-link-item[data-rel-path]"
+        ".version-link-item[data-rel-path]",
       );
       versionLinkItems.forEach((item) => {
         item.addEventListener("click", () => {
@@ -2230,7 +2230,7 @@ ${
   async deleteMissingModel(path) {
     if (
       !confirm(
-        "Remove this missing model from the database?\n\nThis will delete all associated data including notes, tags, and images. This cannot be undone."
+        "Remove this missing model from the database?\n\nThis will delete all associated data including notes, tags, and images. This cannot be undone.",
       )
     ) {
       return;
@@ -2297,7 +2297,7 @@ ${
         <span class="info-label">${this.formatKey(key)}</span>
         <span class="info-value">${this.escapeHtml(value)}</span>
       </div>
-    `
+    `,
       )
       .join("");
 
@@ -2328,7 +2328,7 @@ ${
                 <div class="form-group">
                     <label class="form-label">Model Name</label>
                     <input type="text" class="form-input" name="name" value="${this.escapeHtml(
-                      model.name || ""
+                      model.name || "",
                     )}" required>
                 </div>
 
@@ -2392,7 +2392,7 @@ ${
                 <div class="form-group">
                     <label class="form-label">Base Model</label>
                     <input type="text" class="form-input" name="baseModel" value="${this.escapeHtml(
-                      model.baseModel || ""
+                      model.baseModel || "",
                     )}" placeholder="e.g., SD 1.5, SDXL 1.0, Flux">
                 </div>
 
@@ -2460,7 +2460,7 @@ ${
                 <div class="form-group">
                     <label class="form-label">Notes</label>
                     <textarea class="form-textarea" name="notes" placeholder="Add your notes here...">${this.escapeHtml(
-                      model.notes || ""
+                      model.notes || "",
                     )}</textarea>
                 </div>
 
@@ -2479,14 +2479,14 @@ ${
                                   (prompt, idx) => `
                             <div class="prompt-editor" data-idx="${idx}">
                                 <input type="text" class="form-input" placeholder="Prompt title" value="${this.escapeHtml(
-                                  prompt.title
+                                  prompt.title,
                                 )}" name="promptTitle_${idx}">
                                 <textarea class="form-textarea" placeholder="Prompt text" name="promptText_${idx}" style="margin-top: 8px; min-height: 60px;">${this.escapeHtml(
-                                    prompt.prompt
-                                  )}</textarea>
+                                  prompt.prompt,
+                                )}</textarea>
                                 <button type="button" class="btn-remove" onclick="app.removePrompt(${idx})">Remove</button>
                             </div>
-                        `
+                        `,
                                 )
                                 .join("")
                             : ""
@@ -2605,7 +2605,7 @@ ${
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(model),
-        }
+        },
       );
 
       if (response.ok) {
@@ -2674,7 +2674,7 @@ ${
 
   removePrompt(idx) {
     const promptEditor = document.querySelector(
-      `.prompt-editor[data-idx="${idx}"]`
+      `.prompt-editor[data-idx="${idx}"]`,
     );
     if (promptEditor) {
       promptEditor.remove();
@@ -2791,7 +2791,7 @@ ${
       const versionId = model.civitaiVersionId;
       if (versionId) {
         const version = model.civitaiData.versions.find(
-          (v) => v.id === versionId
+          (v) => v.id === versionId,
         );
         if (version && (version.publishedAt || version.createdAt)) {
           return version.publishedAt || version.createdAt;
@@ -2818,7 +2818,7 @@ ${
         `/api/models/${encodeURIComponent(path)}/favorite`,
         {
           method: "POST",
-        }
+        },
       );
 
       if (response.ok) {
@@ -2881,7 +2881,7 @@ ${
     } else {
       lightboxContent.innerHTML = `
       <img id="lightboxMedia" src="images/${imagePath}" alt="${this.escapeHtml(
-        caption || ""
+        caption || "",
       )}" style="max-width: 90%; max-height: 90vh; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
     `;
     }
@@ -2905,10 +2905,10 @@ ${
         }>🔴 X</option>
       </select>
       <button class="btn-lightbox-save" onclick="app.saveLightboxRating('${this.escapeAttribute(
-        imagePath
+        imagePath,
       )}', '${this.escapeAttribute(actualModelPath)}')">💾 Save</button>
       <button class="btn-lightbox-delete" onclick="app.deleteLightboxMedia('${this.escapeAttribute(
-        imagePath
+        imagePath,
       )}', '${this.escapeAttribute(actualModelPath)}')">🗑️ Delete</button>
           </div>
         `;
@@ -2972,7 +2972,7 @@ ${
 
     try {
       const response = await fetch(
-        `/api/media/${encodeURIComponent(imagePath)}/metadata`
+        `/api/media/${encodeURIComponent(imagePath)}/metadata`,
       );
       const result = await response.json();
 
@@ -3061,9 +3061,8 @@ ${
 
     const modelHash =
       metadata.model_hash || model?.hash?.substring(0, 10) || "unknown";
-    document.getElementById(
-      "metaCheckpointHash"
-    ).textContent = `Hash: ${modelHash}...`;
+    document.getElementById("metaCheckpointHash").textContent =
+      `Hash: ${modelHash}...`;
 
     // LoRAs
     const loraList = document.getElementById("metaLoraList");
@@ -3075,7 +3074,7 @@ ${
           <div class="lora-name">${this.escapeHtml(lora.name)}</div>
           <div class="lora-weight">Weight: ${lora.strength}</div>
         </div>
-      `
+      `,
         )
         .join("");
     } else {
@@ -3095,7 +3094,7 @@ ${
           <div class="controlnet-name">${this.escapeHtml(cn.name)}</div>
           <div class="controlnet-details">Weight: ${cn.strength}</div>
         </div>
-      `
+      `,
         )
         .join("");
     } else {
@@ -3143,7 +3142,7 @@ ${
         break;
       case "seed":
         textToCopy = document.querySelector(
-          "#metaSeed .seed-value"
+          "#metaSeed .seed-value",
         ).textContent;
         break;
     }
@@ -3199,7 +3198,7 @@ ${
             filename: imagePath,
             rating: newRating,
           }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -3233,7 +3232,7 @@ ${
           body: JSON.stringify({
             filename: imagePath,
           }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -3372,7 +3371,7 @@ ${
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ versionId }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -3398,7 +3397,7 @@ ${
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ versionId }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -3530,7 +3529,7 @@ ${
       console.log(
         "✅ Loaded new database:",
         Object.keys(newDb.models).length,
-        "models"
+        "models",
       );
 
       const mergeResult = this.analyzeMerge(this.modelData, newDb);
@@ -3568,7 +3567,7 @@ ${
     Object.entries(oldDb.models || {}).forEach(([path, model]) => {
       if (path.startsWith("_missing/")) {
         console.log(
-          `⏭️  Skipping already-missing entry during analysis: ${path}`
+          `⏭️  Skipping already-missing entry during analysis: ${path}`,
         );
         return;
       }
@@ -3601,7 +3600,7 @@ ${
     console.log(
       "📚 Old database:",
       oldPaths.size,
-      "non-missing models indexed"
+      "non-missing models indexed",
     );
 
     const processedOldPaths = new Set();
@@ -3807,10 +3806,10 @@ ${
 
         if (type === "matched" && item.pathChanged) {
           html += `<div class="item-path">${this.escapeHtml(
-            item.newPath
+            item.newPath,
           )}</div>`;
           html += `<div class="item-note">📁 Path changed from: ${this.escapeHtml(
-            item.oldPath
+            item.oldPath,
           )}</div>`;
         } else {
           html += `<div class="item-path">${this.escapeHtml(item.path)}</div>`;
@@ -3855,7 +3854,7 @@ ${
       await this.loadFromServer();
 
       this.showToast(
-        `✅ Merge complete! ${analysis.stats.matched} matched, ${analysis.stats.new} new, ${analysis.stats.missing} missing`
+        `✅ Merge complete! ${analysis.stats.matched} matched, ${analysis.stats.new} new, ${analysis.stats.missing} missing`,
       );
       this.closeImportModal();
     } catch (error) {
@@ -3882,7 +3881,7 @@ ${
       if (path.startsWith("_missing/")) {
         alreadyMissingPaths.add(path);
         alreadyMissingPaths.add(
-          model._lastSeenPath || path.replace(/^_missing\//, "")
+          model._lastSeenPath || path.replace(/^_missing\//, ""),
         );
         console.log(`📝 Tracking deleted missing model: ${path}`);
         return; // Don't index missing entries for matching
@@ -3952,7 +3951,7 @@ ${
         alreadyMissingPaths.has(`_missing/${item.path}`)
       ) {
         console.log(
-          `⏭️  Skipping previously deleted missing model: ${item.path}`
+          `⏭️  Skipping previously deleted missing model: ${item.path}`,
         );
         return;
       }
@@ -3970,7 +3969,7 @@ ${
     });
 
     console.log(
-      `✅ Merge complete: ${Object.keys(merged.models).length} total models`
+      `✅ Merge complete: ${Object.keys(merged.models).length} total models`,
     );
     return merged;
   }
@@ -4059,20 +4058,36 @@ ${
     });
 
     // Preserve version linking and metadata so visual stacking survives imports
-    if (oldModel.relatedVersions && Array.isArray(oldModel.relatedVersions) && oldModel.relatedVersions.length > 0) {
+    if (
+      oldModel.relatedVersions &&
+      Array.isArray(oldModel.relatedVersions) &&
+      oldModel.relatedVersions.length > 0
+    ) {
       merged.relatedVersions = oldModel.relatedVersions;
-      console.log('  ✅ Preserved relatedVersions from old model');
-    } else if (newModel.relatedVersions && Array.isArray(newModel.relatedVersions) && newModel.relatedVersions.length > 0) {
+      console.log("  ✅ Preserved relatedVersions from old model");
+    } else if (
+      newModel.relatedVersions &&
+      Array.isArray(newModel.relatedVersions) &&
+      newModel.relatedVersions.length > 0
+    ) {
       merged.relatedVersions = newModel.relatedVersions;
-      console.log('  ✅ Preserved relatedVersions from new model');
+      console.log("  ✅ Preserved relatedVersions from new model");
     }
 
-    if (oldModel.linkMetadata && typeof oldModel.linkMetadata === 'object' && Object.keys(oldModel.linkMetadata).length > 0) {
+    if (
+      oldModel.linkMetadata &&
+      typeof oldModel.linkMetadata === "object" &&
+      Object.keys(oldModel.linkMetadata).length > 0
+    ) {
       merged.linkMetadata = oldModel.linkMetadata;
-      console.log('  ✅ Preserved linkMetadata from old model');
-    } else if (newModel.linkMetadata && typeof newModel.linkMetadata === 'object' && Object.keys(newModel.linkMetadata).length > 0) {
+      console.log("  ✅ Preserved linkMetadata from old model");
+    } else if (
+      newModel.linkMetadata &&
+      typeof newModel.linkMetadata === "object" &&
+      Object.keys(newModel.linkMetadata).length > 0
+    ) {
       merged.linkMetadata = newModel.linkMetadata;
-      console.log('  ✅ Preserved linkMetadata from new model');
+      console.log("  ✅ Preserved linkMetadata from new model");
     }
 
     return merged;
@@ -4130,7 +4145,7 @@ ${
       mediaArray = [];
     } else if (!Array.isArray(mediaArray)) {
       mediaArray = Object.values(mediaArray).filter(
-        (item) => item && typeof item === "object"
+        (item) => item && typeof item === "object",
       );
     }
 
@@ -4158,7 +4173,7 @@ ${
     if (!Array.isArray(mediaArray)) {
       if (typeof mediaArray === "object") {
         mediaArray = Object.values(mediaArray).filter(
-          (item) => item && typeof item === "object"
+          (item) => item && typeof item === "object",
         );
       } else {
         mediaArray = [];
@@ -4299,7 +4314,7 @@ ${
       placeholder="${field.placeholder}"
       ${idx > 0 ? 'style="margin-top: 8px;"' : ""}
     >
-  `
+  `,
       )
       .join("");
   }
@@ -4448,7 +4463,7 @@ ${
             rating: rating,
             caption: "",
           }),
-        }
+        },
       );
 
       if (updateResponse.ok) {
