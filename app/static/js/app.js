@@ -2516,11 +2516,18 @@ ${
     const form = document.getElementById("editForm");
     const formData = new FormData(form);
 
-    // Get the model from modelData
-    const model = this.modelData.models[this.selectedModel.path];
+    // Guard: ensure a model is selected
+    if (!this.selectedModel || !this.selectedModel.path) {
+      this.showToast("❌ No model selected");
+      return;
+    }
 
-    // Store old URL to detect changes
-    const oldUrl = model.civitaiUrl || "";
+    // Resolve model object from modelData; fall back to selectedModel if missing
+    const modelPath = this.selectedModel.path;
+    const model = this.modelData.models[modelPath] || this.selectedModel || {};
+
+    // Store old URL to detect changes (safe access)
+    const oldUrl = model?.civitaiUrl || "";
 
     // Update basic fields
     model.name = formData.get("name");
@@ -2616,6 +2623,8 @@ ${
             message += `\n🔍 ${linking.stats.assumed} assumed version link(s)`;
           }
 
+          // Include any auto-filled info returned by the server
+          const autoFilled = result.autoFilled || {};
           if (autoFilled.tags && autoFilled.tags.length > 0) {
             message += `\n📋 Auto-filled ${autoFilled.tags.length} tags`;
           }
@@ -4048,6 +4057,23 @@ ${
         }
       }
     });
+
+    // Preserve version linking and metadata so visual stacking survives imports
+    if (oldModel.relatedVersions && Array.isArray(oldModel.relatedVersions) && oldModel.relatedVersions.length > 0) {
+      merged.relatedVersions = oldModel.relatedVersions;
+      console.log('  ✅ Preserved relatedVersions from old model');
+    } else if (newModel.relatedVersions && Array.isArray(newModel.relatedVersions) && newModel.relatedVersions.length > 0) {
+      merged.relatedVersions = newModel.relatedVersions;
+      console.log('  ✅ Preserved relatedVersions from new model');
+    }
+
+    if (oldModel.linkMetadata && typeof oldModel.linkMetadata === 'object' && Object.keys(oldModel.linkMetadata).length > 0) {
+      merged.linkMetadata = oldModel.linkMetadata;
+      console.log('  ✅ Preserved linkMetadata from old model');
+    } else if (newModel.linkMetadata && typeof newModel.linkMetadata === 'object' && Object.keys(newModel.linkMetadata).length > 0) {
+      merged.linkMetadata = newModel.linkMetadata;
+      console.log('  ✅ Preserved linkMetadata from new model');
+    }
 
     return merged;
   }

@@ -703,7 +703,7 @@ def detect_newer_versions(db):
     Returns:
         Dictionary mapping model paths to their newer version info
     """
-    from datetime import datetime
+    from datetime import datetime, timedelta
     
     print("\n🔍 Detecting newer versions...")
     
@@ -785,7 +785,10 @@ def detect_newer_versions(db):
                 version_date = datetime.fromisoformat(version_published.replace('Z', '+00:00'))
                 
                 # Check if this version is newer than our newest owned version
-                if version_date > newest_owned_date:
+                # Use a small tolerance to avoid treating versions with
+                # practically identical publish timestamps (e.g. high/low
+                # pairs) as newer due to tiny timestamp differences.
+                if (version_date - newest_owned_date) > timedelta(seconds=1):
                     newer_versions.append({
                         'versionId': version_id,
                         'versionName': version.get('name', 'Unknown'),
