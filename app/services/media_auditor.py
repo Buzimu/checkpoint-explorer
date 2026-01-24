@@ -12,8 +12,153 @@ by extracting the hash from the filename and matching it to the model's hash.
 """
 import os
 import re
+import json
+import subprocess
 from app.services.database import load_db, save_db
 from config import IMAGES_DIR
+
+
+def check_video_compatibility(video_path):
+    """
+    Check if a video file is browser-compatible
+    Detects YUV444 chroma subsampling and other incompatible formats
+    
+    Args:
+        video_path: Full path to video file
+        
+    Returns:
+        Dict with keys: compatible (bool), issues (list), pix_fmt (str), codec (str)
+    """
+    try:
+        # Use ffprobe to analyze video
+        cmd = [
+            'ffprobe', '-v', 'quiet', '-print_format', 'json',
+            '-show_streams', '-select_streams', 'v:0',
+            video_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        
+        if result.returncode != 0:
+            return {'compatible': False, 'issues': ['Failed to analyze video'], 'pix_fmt': None, 'codec': None}
+        
+        data = json.loads(result.stdout)
+        if not data.get('streams'):
+            return {'compatible': False, 'issues': ['No video stream found'], 'pix_fmt': None, 'codec': None}
+        
+        stream = data['streams'][0]
+        pix_fmt = stream.get('pix_fmt', '')
+        codec = stream.get('codec_name', '')
+        profile = stream.get('profile', '')
+        
+        issues = []
+        compatible = True
+        
+        # Check for YUV444 (incompatible with most browsers)
+        if 'yuv444' in pix_fmt.lower() or '444' in pix_fmt:
+            issues.append(f'Incompatible chroma subsampling: {pix_fmt} (YUV444)')
+            compatible = False
+        
+        # Check for H.264 High 4:4:4 Predictive profile (incompatible with Firefox/most browsers)
+        if codec == 'h264' and '4:4:4' in profile:
+            issues.append(f'Incompatible H.264 profile: {profile} (not supported by Firefox)')
+            compatible = False
+        
+        # Check for uncommon pixel formats
+        if pix_fmt not in ['yuv420p', 'yuvj420p', 'yuv422p']:
+            if compatible:  # Only add as warning if not already flagged
+                issues.append(f'Uncommon pixel format: {pix_fmt}')
+        
+        return {
+            'compatible': compatible,
+            'issues': issues,
+            'pix_fmt': pix_fmt,
+            'codec': codec,
+            'profile': profile
+        }
+    except subprocess.TimeoutExpired:
+        return {'compatible': False, 'issues': ['Video analysis timed out'], 'pix_fmt': None, 'codec': None}
+    except FileNotFoundError:
+        return {'compatible': False, 'issues': ['ffprobe not found - install ffmpeg'], 'pix_fmt': None, 'codec': None}
+    except Exception as e:
+        return {'compatible': False, 'issues': [f'Analysis error: {str(e)}'], 'pix_fmt': None, 'codec': None}
+
+
+def reencode_video_to_yuv420(video_path):
+    """
+    Re-encode a video to YUV420p with baseline H.264 profile for maximum browser compatibility
+    Creates a backup of the original file
+    
+    Args:
+        video_path: Full path to video file
+        
+    Returns:
+        Dict with keys: success (bool), message (str), backup_path (str or None)
+    """
+    try:
+        backup_path = video_path + '.backup'
+        
+        # Create backup
+        import shutil
+        shutil.copy2(video_path, backup_path)
+        
+        # Create temporary output file
+        temp_output = video_path + '.temp.mp4'
+        
+        # Re-encode to YUV420p with H.264 baseline profile for maximum compatibility
+        cmd = [
+            'ffmpeg', '-i', video_path,
+            '-pix_fmt', 'yuv420p',
+            '-c:v', 'libx264',
+            '-profile:v', 'high',  # Use High profile (widely supported), not High 4:4:4
+            '-level', '4.1',
+            '-preset', 'medium',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',
+            '-y',  # Overwrite output
+            temp_output
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0:
+            # Cleanup on failure
+            if os.path.exists(temp_output):
+                os.remove(temp_output)
+            os.remove(backup_path)
+            return {
+                'success': False,
+                'message': f'Re-encoding failed: {result.stderr[:200]}',
+                'backup_path': None
+            }
+        
+        # Replace original with re-encoded version
+        os.replace(temp_output, video_path)
+        
+        return {
+            'success': True,
+            'message': 'Successfully re-encoded to YUV420p',
+            'backup_path': backup_path
+        }
+        
+    except subprocess.TimeoutExpired:
+        # Cleanup
+        if os.path.exists(temp_output):
+            os.remove(temp_output)
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+        return {'success': False, 'message': 'Re-encoding timed out (>5 minutes)', 'backup_path': None}
+    except FileNotFoundError:
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+        return {'success': False, 'message': 'ffmpeg not found - install ffmpeg', 'backup_path': None}
+    except Exception as e:
+        # Cleanup on error
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+        return {'success': False, 'message': f'Re-encoding error: {str(e)}', 'backup_path': None}
 
 
 def parse_media_filename(filename):
@@ -111,20 +256,22 @@ def rename_media_file(old_filename, new_filename):
         return False
 
 
-def audit_media_for_model(db, model_path, model):
+def audit_media_for_model(db, model_path, model, reencode_videos=True):
     """
     Audit media files for a specific model
-    Removes invalid references, adds missing media, and renames to standard format
+    Removes invalid references, adds missing media, renames to standard format,
+    and re-encodes incompatible videos
     
     Args:
         db: Database dictionary
         model_path: Path to the model
         model: Model dictionary
+        reencode_videos: Whether to re-encode incompatible videos (default: True)
         
     Returns:
-        Dict with stats: removed, added, verified, renamed
+        Dict with stats: removed, added, verified, renamed, reencoded, video_errors
     """
-    stats = {'removed': 0, 'added': 0, 'verified': 0, 'renamed': 0}
+    stats = {'removed': 0, 'added': 0, 'verified': 0, 'renamed': 0, 'reencoded': 0, 'video_errors': 0}
     
     model_hash_prefix = get_model_hash_prefix(model)
     if not model_hash_prefix:
@@ -147,6 +294,28 @@ def audit_media_for_model(db, model_path, model):
             print(f"   🗑️  Removed missing reference: {filename}")
             stats['removed'] += 1
             continue
+        
+        # Check video compatibility if it's a video file
+        ext = os.path.splitext(filename)[1].lower()
+        if reencode_videos and ext in ['.mp4', '.webm']:
+            compat = check_video_compatibility(file_path)
+            
+            if not compat['compatible']:
+                print(f"   ⚠️  Incompatible video detected: {filename}")
+                for issue in compat['issues']:
+                    print(f"      - {issue}")
+                
+                if 'YUV444' in ' '.join(compat['issues']) or '444' in compat.get('pix_fmt', '') or '4:4:4' in compat.get('profile', ''):
+                    print(f"   🔄 Re-encoding to compatible format...")
+                    result = reencode_video_to_yuv420(file_path)
+                    
+                    if result['success']:
+                        print(f"   ✅ {result['message']}")
+                        print(f"      Backup: {result['backup_path']}")
+                        stats['reencoded'] += 1
+                    else:
+                        print(f"   ❌ {result['message']}")
+                        stats['video_errors'] += 1
         
         # Check if filename matches standard format
         parsed = parse_media_filename(filename)
@@ -221,28 +390,33 @@ def audit_media_for_model(db, model_path, model):
     return stats
 
 
-def audit_all_media(db):
+def audit_all_media(db, reencode_videos=True):
     """
     Audit all media files across all models
     
     1. Verify existing media references
     2. Re-associate orphaned media based on hash matching
-    3. Report statistics
+    3. Re-encode incompatible videos to YUV420p
+    4. Report statistics
     
     Args:
         db: Database dictionary
+        reencode_videos: Whether to re-encode incompatible videos (default: True)
         
     Returns:
         Dict with overall stats and per-model details
     """
     print("\n🔍 === MEDIA AUDIT START ===")
+    print(f"   Video re-encoding: {'ENABLED' if reencode_videos else 'DISABLED'}")
     
     overall_stats = {
         'models_audited': 0,
         'media_verified': 0,
         'references_removed': 0,
         'media_re_associated': 0,
-        'media_renamed': 0
+        'media_renamed': 0,
+        'videos_reencoded': 0,
+        'video_errors': 0
     }
     
     model_details = []
@@ -253,21 +427,23 @@ def audit_all_media(db):
         if not model_hash_prefix:
             continue
         
-        model_stats = audit_media_for_model(db, model_path, model)
+        model_stats = audit_media_for_model(db, model_path, model, reencode_videos=reencode_videos)
         
         overall_stats['models_audited'] += 1
         overall_stats['media_verified'] += model_stats['verified']
         overall_stats['references_removed'] += model_stats['removed']
         overall_stats['media_re_associated'] += model_stats['added']
         overall_stats['media_renamed'] += model_stats['renamed']
+        overall_stats['videos_reencoded'] += model_stats['reencoded']
+        overall_stats['video_errors'] += model_stats['video_errors']
         
-        if model_stats['removed'] > 0 or model_stats['added'] > 0 or model_stats['renamed'] > 0:
+        if model_stats['removed'] > 0 or model_stats['added'] > 0 or model_stats['renamed'] > 0 or model_stats['reencoded'] > 0:
             model_details.append({
                 'path': model_path,
                 'name': model.get('name', 'Unknown'),
                 'stats': model_stats
             })
-            print(f"📦 {model.get('name', 'Unknown')}: verified={model_stats['verified']}, removed={model_stats['removed']}, added={model_stats['added']}, renamed={model_stats['renamed']}")
+            print(f"📦 {model.get('name', 'Unknown')}: verified={model_stats['verified']}, removed={model_stats['removed']}, added={model_stats['added']}, renamed={model_stats['renamed']}, reencoded={model_stats['reencoded']}")
     
     print(f"\n✅ Audit complete:")
     print(f"   Models audited: {overall_stats['models_audited']}")
@@ -275,6 +451,9 @@ def audit_all_media(db):
     print(f"   References removed: {overall_stats['references_removed']}")
     print(f"   Media re-associated: {overall_stats['media_re_associated']}")
     print(f"   Media renamed: {overall_stats['media_renamed']}")
+    print(f"   Videos re-encoded: {overall_stats['videos_reencoded']}")
+    if overall_stats['video_errors'] > 0:
+        print(f"   ⚠️  Video errors: {overall_stats['video_errors']}")
     print("=== MEDIA AUDIT END ===\n")
     
     return {

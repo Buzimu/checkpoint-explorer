@@ -73,19 +73,21 @@ class BackgroundScraper:
             
             print("\n🔍 Running scheduled full media audit...")
             db = load_db()
-            audit_results = audit_all_media(db)
+            audit_results = audit_all_media(db, reencode_videos=True)
             
-            total_added = audit_results.get('total_added', 0)
-            total_removed = audit_results.get('total_removed', 0)
-            total_verified = audit_results.get('total_verified', 0)
+            stats = audit_results.get('stats', {})
+            total_added = stats.get('media_re_associated', 0)
+            total_removed = stats.get('references_removed', 0)
+            total_verified = stats.get('media_verified', 0)
+            total_reencoded = stats.get('videos_reencoded', 0)
             
-            if total_added > 0 or total_removed > 0:
+            if total_added > 0 or total_removed > 0 or total_reencoded > 0:
                 save_db(db)
-                print(f"✅ Media audit complete: verified={total_verified}, removed={total_removed}, added={total_added}")
+                print(f"✅ Media audit complete: verified={total_verified}, removed={total_removed}, added={total_added}, reencoded={total_reencoded}")
                 
                 # Log activity
                 service = get_civitai_service()
-                details = f"verified={total_verified}, removed={total_removed}, added={total_added}"
+                details = f"verified={total_verified}, removed={total_removed}, added={total_added}, reencoded={total_reencoded}"
                 service.log_activity('Media Audit', 'All Models', 'success', details)
             else:
                 print(f"✅ Media audit complete: all {total_verified} files verified")
